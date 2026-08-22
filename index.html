@@ -222,7 +222,7 @@
   <div id="log">Pronto. In attesa di comandi...</div>
 
   <script type="module">
-    import { Buffer, ChameleonUltra, Slot, TagFreq, TagType } from 'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/+esm';
+    import { Buffer, ChameleonUltra, Slot, TagType } from 'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/+esm';
     import WebbleAdapter from 'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/plugin/WebbleAdapter/+esm';
 
     const ultra = new ChameleonUltra();
@@ -577,6 +577,7 @@
       }
     });
 
+    // Scrittura sicura dei blocchi Mifare nella memoria di emulazione
     async function writeMf1BlockSafe(blockIndex, block16Bytes) {
       const buf = Buffer.from(block16Bytes);
       if (typeof ultra.cmdMf1SetBlockData === 'function') {
@@ -585,21 +586,16 @@
         } catch (e) {
           return await ultra.cmdMf1SetBlockData({ block: blockIndex, data: buf });
         }
-      }
-    }
-
-    async function setLfEm410xIdSafe(emxBytes) {
-      const buf = Buffer.from(emxBytes);
-      if (typeof ultra.cmdLfEm410xSetId === 'function') {
+      } else if (typeof ultra.cmdMf1SetBlock === 'function') {
         try {
-          return await ultra.cmdLfEm410xSetId(buf);
+          return await ultra.cmdMf1SetBlock(blockIndex, buf);
         } catch (e) {
-          return await ultra.cmdLfEm410xSetId({ id: buf });
+          return await ultra.cmdMf1SetBlock({ block: blockIndex, data: buf });
         }
       }
     }
 
-    // Scrittura batch con TagFreq corretto
+    // Scrittura batch del gruppo attivo
     btnFlashGroup.addEventListener('click', async () => {
       const activeCards = groups[currentGroupIndex];
       btnFlashGroup.disabled = true;
@@ -611,11 +607,9 @@
         const item = activeCards[i];
         const slot = slotsEnum[i];
 
-        // Se lo slot è vuoto, disabilita entrambe le frequenze HF e LF
         if (!item) {
           try {
-            await ultra.cmdSlotSetEnable(slot, TagFreq.HF, false);
-            await ultra.cmdSlotSetEnable(slot, TagFreq.LF, false);
+            await ultra.cmdSlotSetEnable(slot, TagType.UNKNOWN || 0, TagType.UNKNOWN || 0);
             log(`Slot ${i + 1}: Disabilitato (vuoto)`);
           } catch (e) {}
           continue;
@@ -623,7 +617,7 @@
 
         log(`Slot ${i + 1}: Flash (${item.name || item.uid})...`);
         try {
-          // 1. Attiva lo slot fisico
+          // 1. Attiva lo slot
           await ultra.cmdSlotSetActive(slot);
 
           // 2. Anticollisione HF (UID, SAK, ATQA)
@@ -634,22 +628,26 @@
             sak: Buffer.from([typeof item.sak === 'number' ? item.sak : 8])
           });
 
-          // 3. Scrittura blocchi memoria Mifare Classic
+          // 3. Scrittura dei 64 blocchi Mifare Classic 1K
           for (let b = 0; b < 64; b++) {
             const blockData = item.data[b] || new Array(16).fill(0);
             await writeMf1BlockSafe(b, blockData);
           }
 
-          // 4. Abilita la frequenza HF (13.56 MHz) per lo slot
-          await ultra.cmdSlotSetEnable(slot, TagFreq.HF, true);
-
-          // 5. Configurazione e abilitazione LF EMX (125 kHz)
-          if (emxBytes) {
-            await setLfEm410xIdSafe(emxBytes);
-            await ultra.cmdSlotSetEnable(slot, TagFreq.LF, true);
-          } else {
-            await ultra.cmdSlotSetEnable(slot, TagFreq.LF, false);
+          // 4. Codice LF EMX Standard (se impostato)
+          let lfTag = TagType.UNKNOWN || 0;
+          if (emxBytes && typeof ultra.cmdLfEm410xSetId === 'function') {
+            try {
+              await ultra.cmdLfEm410xSetId(Buffer.from(emxBytes));
+            } catch (e) {
+              await ultra.cmdLfEm410xSetId({ id: Buffer.from(emxBytes) });
+            }
+            lfTag = TagType.EM410X || 100;
           }
+
+          // 5. Abilita lo slot
+          const hfTag = item.tag || TagType.MIFARE_1024 || 1001;
+          await ultra.cmdSlotSetEnable(slot, hfTag, lfTag);
 
         } catch (err) {
           log(`Errore Slot ${i + 1}: ${err.message}`);
