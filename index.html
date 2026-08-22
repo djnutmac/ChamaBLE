@@ -577,31 +577,34 @@
       }
     });
 
-    // Helper universali per l'invio comandi
-    async function setSlotActive(slot) {
-      if (typeof ultra.cmdSlotSetActive === 'function') {
-        return await ultra.cmdSlotSetActive(slot);
-      } else if (typeof ultra.cmdSlotSetActiveSlot === 'function') {
-        return await ultra.cmdSlotSetActiveSlot(slot);
-      } else if (typeof ultra.cmdSlotChangeActive === 'function') {
-        return await ultra.cmdSlotChangeActive(slot);
+    // Scrittura blocchi Mifare Classic (gestione per intero dump o blocco per blocco)
+    async function writeMf1DataSafe(flatData) {
+      const buf = Buffer.from(flatData);
+      
+      if (typeof ultra.cmdMf1SetBlockData === 'function') {
+        try {
+          return await ultra.cmdMf1SetBlockData({ block: 0, data: buf });
+        } catch (e) {}
       }
-    }
 
-    async function writeMf1BlockData(flatBlocks) {
-      const buf = Buffer.from(flatBlocks);
       if (typeof ultra.cmdMf1WriteBlockData === 'function') {
-        return await ultra.cmdMf1WriteBlockData(buf);
-      } else if (typeof ultra.cmdMf1SetBlockData === 'function') {
-        return await ultra.cmdMf1SetBlockData(buf);
-      } else if (typeof ultra.cmdMf1WriteBlock === 'function') {
-        for (let b = 0; b < flatBlocks.length / 16; b++) {
-          await ultra.cmdMf1WriteBlock(b, buf.slice(b * 16, (b + 1) * 16));
+        try {
+          return await ultra.cmdMf1WriteBlockData({ block: 0, data: buf });
+        } catch (e) {}
+      }
+
+      // Fallback: scrittura blocco per blocco (64 blocchi da 16 byte)
+      for (let b = 0; b < flatData.length / 16; b++) {
+        const slice = buf.slice(b * 16, (b + 1) * 16);
+        if (typeof ultra.cmdMf1SetBlockData === 'function') {
+          await ultra.cmdMf1SetBlockData({ block: b, data: slice });
+        } else if (typeof ultra.cmdMf1WriteBlock === 'function') {
+          await ultra.cmdMf1WriteBlock({ block: b, data: slice });
         }
       }
     }
 
-    // Flashing del gruppo attivo
+    // Scrittura batch del gruppo attivo
     btnFlashGroup.addEventListener('click', async () => {
       const activeCards = groups[currentGroupIndex];
       btnFlashGroup.disabled = true;
@@ -624,7 +627,7 @@
         log(`Slot ${i + 1}: Flash (${item.name || item.uid})...`);
         try {
           // 1. Attiva lo slot
-          await setSlotActive(slot);
+          await ultra.cmdSlotSetActive(slot);
 
           // 2. Anticollisione HF (UID, SAK, ATQA)
           const uidBytes = item.uid.replace(/\s+/g, '').match(/.{1,2}/g).map(b => parseInt(b, 16));
@@ -636,12 +639,16 @@
 
           // 3. Blocchi Mifare Classic
           const flattenedData = item.data.flat(Infinity);
-          await writeMf1BlockData(flattenedData);
+          await writeMf1DataSafe(flattenedData);
 
           // 4. Codice LF EMX Standard (se presente)
           let lfTag = TagType.UNKNOWN || 0;
           if (emxBytes && typeof ultra.cmdLfEm410xSetId === 'function') {
-            await ultra.cmdLfEm410xSetId(Buffer.from(emxBytes));
+            try {
+              await ultra.cmdLfEm410xSetId({ id: Buffer.from(emxBytes) });
+            } catch (e) {
+              await ultra.cmdLfEm410xSetId(Buffer.from(emxBytes));
+            }
             lfTag = TagType.EM410X || 100;
           }
 
