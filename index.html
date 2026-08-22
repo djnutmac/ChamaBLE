@@ -590,11 +590,13 @@
         const item = activeCards[i];
         const slot = slotsEnum[i];
 
-        // Se lo slot è vuoto nel gruppo, disabilita entrambe le frequenze e lo salta
+        // Se lo slot è vuoto nel gruppo, disabilita entrambe le frequenze, pulisce i nickname e lo salta
         if (!item) {
           try {
             await ultra.cmdSlotSetEnable(slot, FreqType.HF, false);
             await ultra.cmdSlotSetEnable(slot, FreqType.LF, false);
+            try { await ultra.cmdSlotDeleteFreqName(slot, FreqType.HF); } catch (e) {}
+            try { await ultra.cmdSlotDeleteFreqName(slot, FreqType.LF); } catch (e) {}
             await ultra.cmdSlotSaveSettings();
             log(`Slot ${i + 1}: Disabilitato (vuoto)`);
           } catch (e) {}
@@ -642,7 +644,16 @@
             await ultra.cmdEm410xSetEmuId(Buffer.from(emxBytes));
           }
 
-          // 8. SALVA TUTTO IN MEMORIA PERSISTENTE
+          // 8. AGGIORNA IL NICKNAME DELLO SLOT (altrimenti CU GUI mostra ancora il nome vecchio!)
+          const freqName = (item.name || item.uid || `Slot ${i + 1}`).slice(0, 32);
+          try { await ultra.cmdSlotSetFreqName(slot, FreqType.HF, freqName); } catch (e) {}
+          if (hasLf) {
+            try { await ultra.cmdSlotSetFreqName(slot, FreqType.LF, 'EMX Master'); } catch (e) {}
+          } else {
+            try { await ultra.cmdSlotDeleteFreqName(slot, FreqType.LF); } catch (e) {}
+          }
+
+          // 9. SALVA TUTTO IN MEMORIA PERSISTENTE
           await ultra.cmdSlotSaveSettings();
           log(`Slot ${i + 1}: Completato`);
 
