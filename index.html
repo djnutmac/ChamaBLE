@@ -577,29 +577,20 @@
       }
     });
 
-    // Scrittura blocchi Mifare Classic (gestione per intero dump o blocco per blocco)
-    async function writeMf1DataSafe(flatData) {
-      const buf = Buffer.from(flatData);
-      
+    // Scrittura sicura dei blocchi Mifare nella memoria di emulazione
+    async function writeMf1BlockSafe(blockIndex, block16Bytes) {
+      const buf = Buffer.from(block16Bytes);
       if (typeof ultra.cmdMf1SetBlockData === 'function') {
         try {
-          return await ultra.cmdMf1SetBlockData({ block: 0, data: buf });
-        } catch (e) {}
-      }
-
-      if (typeof ultra.cmdMf1WriteBlockData === 'function') {
+          return await ultra.cmdMf1SetBlockData(blockIndex, buf);
+        } catch (e) {
+          return await ultra.cmdMf1SetBlockData({ block: blockIndex, data: buf });
+        }
+      } else if (typeof ultra.cmdMf1SetBlock === 'function') {
         try {
-          return await ultra.cmdMf1WriteBlockData({ block: 0, data: buf });
-        } catch (e) {}
-      }
-
-      // Fallback: scrittura blocco per blocco (64 blocchi da 16 byte)
-      for (let b = 0; b < flatData.length / 16; b++) {
-        const slice = buf.slice(b * 16, (b + 1) * 16);
-        if (typeof ultra.cmdMf1SetBlockData === 'function') {
-          await ultra.cmdMf1SetBlockData({ block: b, data: slice });
-        } else if (typeof ultra.cmdMf1WriteBlock === 'function') {
-          await ultra.cmdMf1WriteBlock({ block: b, data: slice });
+          return await ultra.cmdMf1SetBlock(blockIndex, buf);
+        } catch (e) {
+          return await ultra.cmdMf1SetBlock({ block: blockIndex, data: buf });
         }
       }
     }
@@ -637,17 +628,19 @@
             sak: Buffer.from([typeof item.sak === 'number' ? item.sak : 8])
           });
 
-          // 3. Blocchi Mifare Classic
-          const flattenedData = item.data.flat(Infinity);
-          await writeMf1DataSafe(flattenedData);
+          // 3. Scrittura dei 64 blocchi Mifare Classic 1K
+          for (let b = 0; b < 64; b++) {
+            const blockData = item.data[b] || new Array(16).fill(0);
+            await writeMf1BlockSafe(b, blockData);
+          }
 
-          // 4. Codice LF EMX Standard (se presente)
+          // 4. Codice LF EMX Standard (se impostato)
           let lfTag = TagType.UNKNOWN || 0;
           if (emxBytes && typeof ultra.cmdLfEm410xSetId === 'function') {
             try {
-              await ultra.cmdLfEm410xSetId({ id: Buffer.from(emxBytes) });
-            } catch (e) {
               await ultra.cmdLfEm410xSetId(Buffer.from(emxBytes));
+            } catch (e) {
+              await ultra.cmdLfEm410xSetId({ id: Buffer.from(emxBytes) });
             }
             lfTag = TagType.EM410X || 100;
           }
