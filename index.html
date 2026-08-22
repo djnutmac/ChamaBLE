@@ -264,6 +264,24 @@
       logBox.scrollTop = logBox.scrollHeight;
     }
 
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // Attende che lo slot attivo riportato dal device combaci con quello richiesto,
+    // per evitare che i comandi successivi (anticoll/blocchi) vengano applicati
+    // ancora allo slot precedente per via di un ritardo del firmware nel cambio slot.
+    async function waitForActiveSlot(targetSlot, maxTries = 8) {
+      for (let t = 0; t < maxTries; t++) {
+        try {
+          const active = await ultra.cmdSlotGetActive();
+          if (active === targetSlot) return true;
+        } catch (e) {}
+        await sleep(40);
+      }
+      return false;
+    }
+
     function updateEmxView() {
       if (masterEmxHex) {
         emxDisplay.innerHTML = `ID: <b>${masterEmxHex}</b> (attivo su tutti gli slot)`;
@@ -636,8 +654,17 @@
           await ultra.cmdSlotSetEnable(slot, FreqType.HF, true);
           await ultra.cmdSlotSetEnable(slot, FreqType.LF, hasLf);
 
-          // 4. ATTIVA LO SLOT SELEZIONATO
+          // 4. ATTIVA LO SLOT SELEZIONATO E ATTENDE CONFERMA DAL DEVICE
+          // (senza questa attesa, su BLE può capitare che i comandi successivi
+          // vengano ancora applicati allo slot precedente)
           await ultra.cmdSlotSetActive(slot);
+          const slotOk = await waitForActiveSlot(slot);
+          if (!slotOk) {
+            log(`Slot ${i + 1}: ATTENZIONE, il device non conferma lo slot attivo, riprovo...`);
+            await ultra.cmdSlotSetActive(slot);
+            await waitForActiveSlot(slot, 15);
+          }
+          await sleep(30);
 
           // 5. SCRIVI L'ANTICOLLISIONE (HF)
           const uidBytes = item.uid.replace(/\s+/g, '').match(/.{1,2}/g).map(b => parseInt(b, 16));
@@ -646,11 +673,27 @@
           // Senza questa inversione l'anticollisione fallisce con lettori rigorosi come NFCTools.
           const atqaDisplay = (item.atqa && item.atqa.length === 2) ? item.atqa : [0, 4];
           const atqaWire = [...atqaDisplay].reverse();
-          await ultra.cmdHf14aSetAntiCollData({
+          const antiCollOpts = {
             uid: Buffer.from(uidBytes),
             atqa: Buffer.from(atqaWire),
             sak: Buffer.from([typeof item.sak === 'number' ? item.sak : 8])
-          });
+          };
+          await ultra.cmdHf14aSetAntiCollData(antiCollOpts);
+
+          // Verifica che l'UID scritto sia davvero quello atteso; se non lo è
+          // (scrittura andata su uno slot sbagliato o persa), riprova una volta.
+          let readBack = await ultra.cmdHf14aGetAntiCollData();
+          if (!readBack || Buffer.compare(readBack.uid, antiCollOpts.uid) !== 0) {
+            log(`Slot ${i + 1}: UID non corrisponde dopo la scrittura, riprovo...`);
+            await sleep(50);
+            await ultra.cmdSlotSetActive(slot);
+            await waitForActiveSlot(slot);
+            await ultra.cmdHf14aSetAntiCollData(antiCollOpts);
+            readBack = await ultra.cmdHf14aGetAntiCollData();
+            if (!readBack || Buffer.compare(readBack.uid, antiCollOpts.uid) !== 0) {
+              log(`Slot ${i + 1}: ERRORE, UID ancora errato dopo il retry (atteso ${antiCollOpts.uid.toString('hex')}, letto ${readBack ? readBack.uid.toString('hex') : 'null'})`);
+            }
+          }
 
           // 6. SCRIVI I BLOCCHI IN MEMORIA EMULATORE
           for (let b = 0; b < 64; b++) {
@@ -674,6 +717,7 @@
 
           // 9. SALVA TUTTO IN MEMORIA PERSISTENTE
           await ultra.cmdSlotSaveSettings();
+          await sleep(60);
           log(`Slot ${i + 1}: Completato`);
 
         } catch (err) {
