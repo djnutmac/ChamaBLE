@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chameleon Ultra Manager</title>
+  <title>Chameleon Ultra HF Manager</title>
   <style>
     :root {
       --bg: #0b1120;
@@ -41,21 +41,6 @@
     .btn-dark { background: #334155; color: #f8fafc; }
     .btn-dark:hover { background: #475569; }
     .btn-green { background: var(--success); color: white; width: 100%; font-size: 1rem; padding: 12px; margin-top: 10px; }
-    
-    .emx-box {
-      background: #1e293b;
-      border: 1px solid #0284c7;
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 14px;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-    }
-    .emx-box .title { font-weight: bold; color: #38bdf8; font-size: 0.85rem; }
-    .emx-box .val { font-family: monospace; color: #a5f3fc; font-size: 0.8rem; }
 
     .tools-bar {
       display: flex;
@@ -110,14 +95,13 @@
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      min-height: 120px;
+      min-height: 110px;
     }
     .slot-card.empty { border-style: dashed; opacity: 0.6; align-items: center; justify-content: center; text-align: center; }
     .slot-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
     .slot-num { font-weight: bold; color: #38bdf8; font-size: 0.75rem; }
     .card-name { font-weight: 600; font-size: 0.85rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
-    .card-uid { font-family: monospace; font-size: 0.7rem; color: var(--text-dim); }
-    .badge-lf { display: inline-block; background: #0369a1; color: #e0f2fe; padding: 2px 5px; border-radius: 4px; font-size: 0.65rem; margin-top: 4px; }
+    .card-uid { font-family: monospace; font-size: 0.75rem; color: var(--text-dim); }
 
     .slot-actions {
       display: flex;
@@ -165,22 +149,9 @@
 </head>
 <body>
 
-  <h1>Chameleon Ultra — Manager</h1>
-  <p class="subtitle">Gestione, ordinamento e scrittura selettiva slot RFID</p>
+  <h1>Chameleon Ultra — HF Manager</h1>
+  <p class="subtitle">Caricamento rapido e gestione banchi Mifare Classic (13.56 MHz)</p>
 
-  <!-- Box LF EMX Master -->
-  <div class="emx-box">
-    <div>
-      <div class="title">EMX Standard Master (LF 125kHz)</div>
-      <div class="val" id="emxDisplay">Nessun ID configurato</div>
-    </div>
-    <div style="display: flex; gap: 6px;">
-      <button id="btnPromptEmx" class="btn btn-dark" style="font-size: 0.75rem;">Inserisci Hex</button>
-      <button id="btnClearEmx" class="btn btn-red" style="font-size: 0.75rem; padding: 4px 8px;">✕</button>
-    </div>
-  </div>
-
-  <!-- Barra Strumenti e Sync -->
   <div class="tools-bar">
     <label class="btn btn-dark" style="cursor: pointer;">
       ⬆ Carica File JSON (Bulk)
@@ -222,7 +193,7 @@
   <div id="log">Pronto. In attesa di comandi...</div>
 
   <script type="module">
-    import { Buffer, ChameleonUltra, Slot, TagType } from 'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/+esm';
+    import { Buffer, ChameleonUltra, Slot, TagFreq } from 'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/+esm';
     import WebbleAdapter from 'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/plugin/WebbleAdapter/+esm';
 
     const ultra = new ChameleonUltra();
@@ -239,14 +210,10 @@
       new Array(8).fill(null)
     ];
     let currentGroupIndex = 0;
-    let masterEmxHex = localStorage.getItem('cu_master_emx') || "";
 
     const groupNav = document.getElementById('groupNav');
     const slotsGrid = document.getElementById('slotsGrid');
     const currentGroupName = document.getElementById('currentGroupName');
-    const emxDisplay = document.getElementById('emxDisplay');
-    const btnPromptEmx = document.getElementById('btnPromptEmx');
-    const btnClearEmx = document.getElementById('btnClearEmx');
     const groupFileInput = document.getElementById('groupFileInput');
     const bulkInput = document.getElementById('bulkInput');
     const btnExportPresets = document.getElementById('btnExportPresets');
@@ -262,38 +229,6 @@
       logBox.innerHTML += `\n> ${msg}`;
       logBox.scrollTop = logBox.scrollHeight;
     }
-
-    function updateEmxView() {
-      if (masterEmxHex) {
-        emxDisplay.innerHTML = `ID: <b>${masterEmxHex}</b> (attivo su tutti gli slot)`;
-      } else {
-        emxDisplay.innerText = "Nessun ID configurato (verrà scritta solo la parte HF)";
-      }
-    }
-
-    btnPromptEmx.addEventListener('click', () => {
-      const input = prompt("Inserisci l'ID esadecimale (10 cifre / 5 byte) del badge EMX:", masterEmxHex);
-      if (input !== null) {
-        const clean = input.replace(/[^a-fA-F0-9]/g, '').toUpperCase();
-        if (clean.length === 10) {
-          masterEmxHex = clean;
-          localStorage.setItem('cu_master_emx', masterEmxHex);
-          updateEmxView();
-          renderUI();
-          log(`EMX Master impostato: ${masterEmxHex}`);
-        } else {
-          alert("L'ID deve contenere esattamente 10 caratteri esadecimali (es. 0102A3B4C5).");
-        }
-      }
-    });
-
-    btnClearEmx.addEventListener('click', () => {
-      masterEmxHex = "";
-      localStorage.removeItem('cu_master_emx');
-      updateEmxView();
-      renderUI();
-      log("EMX Master rimosso.");
-    });
 
     function normalizeGroupsData(rawData) {
       const normalized = [];
@@ -316,11 +251,6 @@
         if (res.ok) {
           const raw = await res.json();
           groups = normalizeGroupsData(raw);
-          if (raw.master_emx && !masterEmxHex) {
-            masterEmxHex = raw.master_emx;
-            localStorage.setItem('cu_master_emx', masterEmxHex);
-            updateEmxView();
-          }
           saveToStorage();
           log("Configurazione sincronizzata da presets.json!");
           return true;
@@ -330,7 +260,6 @@
     }
 
     async function initData() {
-      updateEmxView();
       const cached = localStorage.getItem('cu_user_groups');
       if (cached) {
         try {
@@ -381,8 +310,7 @@
                 <button class="slot-btn slot-btn-danger" title="Elimina slot" data-action="delete" data-slot="${s}">🗑️</button>
               </div>
               <div class="card-name" title="${item.name || 'Senza Nome'}">${item.name || 'Senza Nome'}</div>
-              <div class="card-uid">HF: ${item.uid}</div>
-              ${masterEmxHex ? `<div class="badge-lf">LF: ${masterEmxHex}</div>` : ''}
+              <div class="card-uid">UID: ${item.uid}</div>
             </div>
             
             <div class="slot-actions">
@@ -530,11 +458,7 @@
     });
 
     btnExportPresets.addEventListener('click', () => {
-      const payload = {
-        master_emx: masterEmxHex,
-        groups: groups
-      };
-      const jsonStr = JSON.stringify(payload, null, 2);
+      const jsonStr = JSON.stringify(groups, null, 2);
       const blob = new Blob([jsonStr], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -577,7 +501,6 @@
       }
     });
 
-    // Scrittura sicura dei blocchi Mifare nella memoria di emulazione
     async function writeMf1BlockSafe(blockIndex, block16Bytes) {
       const buf = Buffer.from(block16Bytes);
       if (typeof ultra.cmdMf1SetBlockData === 'function') {
@@ -586,22 +509,14 @@
         } catch (e) {
           return await ultra.cmdMf1SetBlockData({ block: blockIndex, data: buf });
         }
-      } else if (typeof ultra.cmdMf1SetBlock === 'function') {
-        try {
-          return await ultra.cmdMf1SetBlock(blockIndex, buf);
-        } catch (e) {
-          return await ultra.cmdMf1SetBlock({ block: blockIndex, data: buf });
-        }
       }
     }
 
-    // Scrittura batch del gruppo attivo
+    // Scrittura batch HF
     btnFlashGroup.addEventListener('click', async () => {
       const activeCards = groups[currentGroupIndex];
       btnFlashGroup.disabled = true;
       log(`Scrittura Gruppo ${currentGroupIndex + 1}...`);
-
-      const emxBytes = masterEmxHex ? masterEmxHex.match(/.{1,2}/g).map(b => parseInt(b, 16)) : null;
 
       for (let i = 0; i < 8; i++) {
         const item = activeCards[i];
@@ -609,7 +524,8 @@
 
         if (!item) {
           try {
-            await ultra.cmdSlotSetEnable(slot, TagType.UNKNOWN || 0, TagType.UNKNOWN || 0);
+            await ultra.cmdSlotSetEnable(slot, TagFreq.HF, false);
+            await ultra.cmdSlotSetEnable(slot, TagFreq.LF, false);
             log(`Slot ${i + 1}: Disabilitato (vuoto)`);
           } catch (e) {}
           continue;
@@ -628,26 +544,15 @@
             sak: Buffer.from([typeof item.sak === 'number' ? item.sak : 8])
           });
 
-          // 3. Scrittura dei 64 blocchi Mifare Classic 1K
+          // 3. Scrittura dei 64 blocchi Mifare Classic
           for (let b = 0; b < 64; b++) {
             const blockData = item.data[b] || new Array(16).fill(0);
             await writeMf1BlockSafe(b, blockData);
           }
 
-          // 4. Codice LF EMX Standard (se impostato)
-          let lfTag = TagType.UNKNOWN || 0;
-          if (emxBytes && typeof ultra.cmdLfEm410xSetId === 'function') {
-            try {
-              await ultra.cmdLfEm410xSetId(Buffer.from(emxBytes));
-            } catch (e) {
-              await ultra.cmdLfEm410xSetId({ id: Buffer.from(emxBytes) });
-            }
-            lfTag = TagType.EM410X || 100;
-          }
-
-          // 5. Abilita lo slot
-          const hfTag = item.tag || TagType.MIFARE_1024 || 1001;
-          await ultra.cmdSlotSetEnable(slot, hfTag, lfTag);
+          // 4. Abilita la frequenza HF e disabilita LF sullo slot
+          await ultra.cmdSlotSetEnable(slot, TagFreq.HF, true);
+          await ultra.cmdSlotSetEnable(slot, TagFreq.LF, false);
 
         } catch (err) {
           log(`Errore Slot ${i + 1}: ${err.message}`);
