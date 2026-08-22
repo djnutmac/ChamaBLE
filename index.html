@@ -641,9 +641,14 @@
 
           // 5. SCRIVI L'ANTICOLLISIONE (HF)
           const uidBytes = item.uid.replace(/\s+/g, '').match(/.{1,2}/g).map(b => parseInt(b, 16));
+          // L'ATQA nei dump (CU GUI/Proxmark) è salvato in ordine "display" (MSB prima),
+          // ma il comando SDK vuole l'ordine "wire" (LSB prima, es. ATQA logico 0x0044 -> byte 44 00).
+          // Senza questa inversione l'anticollisione fallisce con lettori rigorosi come NFCTools.
+          const atqaDisplay = (item.atqa && item.atqa.length === 2) ? item.atqa : [0, 4];
+          const atqaWire = [...atqaDisplay].reverse();
           await ultra.cmdHf14aSetAntiCollData({
             uid: Buffer.from(uidBytes),
-            atqa: Buffer.from(item.atqa && item.atqa.length ? item.atqa : [0, 4]),
+            atqa: Buffer.from(atqaWire),
             sak: Buffer.from([typeof item.sak === 'number' ? item.sak : 8])
           });
 
