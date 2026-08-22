@@ -223,7 +223,7 @@
 
   <!-- Import originali e puliti, IDENTICI al tuo file -->
   <script type="module">
-    import { Buffer, ChameleonUltra, FreqType, Slot, TagType } from 'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/+esm';
+    import { Buffer, ChameleonUltra, DeviceMode, FreqType, Slot, TagType } from 'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/+esm';
     import WebbleAdapter from 'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/plugin/WebbleAdapter/+esm';
 
     const ultra = new ChameleonUltra();
@@ -558,6 +558,14 @@
         log("Ricerca Chameleon Ultra BLE...");
         await ultra.connect();
         log("Connesso al Chameleon Ultra!");
+        // Assicura che il device sia in modalità TAG (emulazione), altrimenti
+        // gli slot vengono scritti correttamente ma non emulati via RF.
+        try {
+          await ultra.assureDeviceMode(DeviceMode.TAG);
+          log("Modalità dispositivo: TAG (emulazione).");
+        } catch (e) {
+          log("Attenzione: impossibile impostare modalità TAG: " + e.message);
+        }
         btnConnect.style.display = "none";
         btnDisconnect.style.display = "inline-block";
         renderUI();
@@ -583,6 +591,12 @@
       const activeCards = groups[currentGroupIndex];
       btnFlashGroup.disabled = true;
       log(`Scrittura Gruppo ${currentGroupIndex + 1}...`);
+
+      try {
+        await ultra.assureDeviceMode(DeviceMode.TAG);
+      } catch (e) {
+        log("Attenzione: impossibile confermare modalità TAG: " + e.message);
+      }
 
       const emxBytes = masterEmxHex ? masterEmxHex.match(/.{1,2}/g).map(b => parseInt(b, 16)) : null;
 
