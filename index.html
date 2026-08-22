@@ -157,7 +157,7 @@
       font-family: monospace;
       font-size: 0.75rem;
       color: #a5f3fc;
-      height: 90px;
+      height: 100px;
       overflow-y: auto;
       margin-top: 14px;
     }
@@ -175,10 +175,6 @@
       <div class="val" id="emxDisplay">Nessun ID configurato</div>
     </div>
     <div style="display: flex; gap: 6px;">
-      <label class="btn btn-dark" style="cursor: pointer; font-size: 0.75rem;">
-        Carica EMX (.json)
-        <input type="file" id="emxFileInput" accept=".json" style="display: none;">
-      </label>
       <button id="btnPromptEmx" class="btn btn-dark" style="font-size: 0.75rem;">Inserisci Hex</button>
       <button id="btnClearEmx" class="btn btn-red" style="font-size: 0.75rem; padding: 4px 8px;">✕</button>
     </div>
@@ -249,7 +245,6 @@
     const slotsGrid = document.getElementById('slotsGrid');
     const currentGroupName = document.getElementById('currentGroupName');
     const emxDisplay = document.getElementById('emxDisplay');
-    const emxFileInput = document.getElementById('emxFileInput');
     const btnPromptEmx = document.getElementById('btnPromptEmx');
     const btnClearEmx = document.getElementById('btnClearEmx');
     const groupFileInput = document.getElementById('groupFileInput');
@@ -276,62 +271,8 @@
       }
     }
 
-    // Parser Universale per file JSON LF / EMX
-    function extractLfHex(json) {
-      // 1. Se c'è una stringa uid o id a 5 byte (10 hex)
-      if (json.uid && typeof json.uid === 'string') {
-        const clean = json.uid.replace(/[^a-fA-F0-9]/g, '').toUpperCase();
-        if (clean.length === 10) return clean;
-      }
-      if (json.id && typeof json.id === 'string' && json.id.length === 10) {
-        const clean = json.id.replace(/[^a-fA-F0-9]/g, '').toUpperCase();
-        if (clean.length === 10) return clean;
-      }
-
-      // 2. Se i dati sono in un array numerico (lineare o annidato)
-      if (json.data && Array.isArray(json.data)) {
-        const flat = json.data.flat(Infinity);
-        if (flat.length === 5 && flat.every(n => typeof n === 'number')) {
-          return flat.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
-        }
-      }
-
-      // 3. Se presente in extra.id o extra.data
-      if (json.extra) {
-        if (json.extra.id) return json.extra.id.replace(/[^a-fA-F0-9]/g, '').toUpperCase().slice(0, 10);
-        if (Array.isArray(json.extra.data)) {
-          return json.extra.data.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase().slice(0, 10);
-        }
-      }
-
-      return null;
-    }
-
-    emxFileInput.addEventListener('change', async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      try {
-        const text = await file.text();
-        const json = JSON.parse(text);
-        const hex = extractLfHex(json);
-
-        if (hex && hex.length === 10) {
-          masterEmxHex = hex;
-          localStorage.setItem('cu_master_emx', masterEmxHex);
-          updateEmxView();
-          renderUI();
-          log(`EMX Master caricato con successo: ${masterEmxHex}`);
-        } else {
-          log(`Formato file EMX non riconosciuto. Usa 'Inserisci Hex' per impostarlo manualmente.`);
-        }
-      } catch (err) {
-        log(`Errore lettura file EMX: ${err.message}`);
-      }
-      emxFileInput.value = '';
-    });
-
     btnPromptEmx.addEventListener('click', () => {
-      const input = prompt("Inserisci ID esadecimale (10 cifre / 5 byte):", masterEmxHex);
+      const input = prompt("Inserisci l'ID esadecimale (10 cifre / 5 byte) del badge EMX:", masterEmxHex);
       if (input !== null) {
         const clean = input.replace(/[^a-fA-F0-9]/g, '').toUpperCase();
         if (clean.length === 10) {
@@ -339,9 +280,9 @@
           localStorage.setItem('cu_master_emx', masterEmxHex);
           updateEmxView();
           renderUI();
-          log(`EMX Master impostato manualmente: ${masterEmxHex}`);
+          log(`EMX Master impostato: ${masterEmxHex}`);
         } else {
-          alert("L'ID deve contenere esattamente 10 cifre esadecimali (es. 0102A3B4C5).");
+          alert("L'ID deve contenere esattamente 10 caratteri esadecimali (es. 0102A3B4C5).");
         }
       }
     });
@@ -375,14 +316,11 @@
         if (res.ok) {
           const raw = await res.json();
           groups = normalizeGroupsData(raw);
-          
-          // Carica anche eventuale EMX presente nel file presets
           if (raw.master_emx && !masterEmxHex) {
             masterEmxHex = raw.master_emx;
             localStorage.setItem('cu_master_emx', masterEmxHex);
             updateEmxView();
           }
-
           saveToStorage();
           log("Configurazione sincronizzata da presets.json!");
           return true;
@@ -591,7 +529,6 @@
       }
     });
 
-    // Salva gruppi e LF master nel pacchetto unico presets.json
     btnExportPresets.addEventListener('click', () => {
       const payload = {
         master_emx: masterEmxHex,
@@ -605,7 +542,7 @@
       a.download = 'presets.json';
       a.click();
       URL.revokeObjectURL(url);
-      log("File presets.json esportato (include sia HF che LF Master)!");
+      log("File presets.json esportato!");
     });
 
     btnClearGroup.addEventListener('click', () => {
@@ -631,7 +568,7 @@
     btnDisconnect.addEventListener('click', async () => {
       try {
         await ultra.disconnect();
-        log("Disconnesso.");
+        log("Chameleon disconnesso.");
         btnConnect.style.display = "inline-block";
         btnDisconnect.style.display = "none";
         renderUI();
@@ -640,6 +577,7 @@
       }
     });
 
+    // Scrittura batch corretta
     btnFlashGroup.addEventListener('click', async () => {
       const activeCards = groups[currentGroupIndex];
       btnFlashGroup.disabled = true;
@@ -649,36 +587,52 @@
 
       for (let i = 0; i < 8; i++) {
         const item = activeCards[i];
+        const slot = slotsEnum[i];
 
         if (!item) {
           try {
-            await ultra.cmdSlotSetEnable(slotsEnum[i], false);
+            // Disabilita lo slot se vuoto (TagType 0 = UNKNOWN)
+            await ultra.cmdSlotSetEnable(slot, TagType.UNKNOWN || 0, TagType.UNKNOWN || 0);
             log(`Slot ${i + 1}: Disabilitato (vuoto)`);
           } catch (e) {}
           continue;
         }
 
-        log(`Slot ${i + 1}: Flash HF (${item.name || item.uid})...`);
+        log(`Slot ${i + 1}: Flash (${item.name || item.uid})...`);
         try {
-          // 1. Configurazione HF (Mifare Classic 1K)
-          await ultra.cmdSlotSetTagType(slotsEnum[i], item.tag || TagType.MIFARE_1024);
-          await ultra.cmdSlotSetActiveSlot(slotsEnum[i]);
+          // 1. Attiva lo slot sul quale scrivere
+          await ultra.cmdSlotSetActiveSlot(slot);
 
+          // 2. Scrivi Anticollisione HF (UID, SAK, ATQA)
           const uidBytes = item.uid.replace(/\s+/g, '').match(/.{1,2}/g).map(b => parseInt(b, 16));
           await ultra.cmdHf14aSetAntiCollData({
             uid: Buffer.from(uidBytes),
-            atqa: Buffer.from(item.atqa),
-            sak: Buffer.from([item.sak])
+            atqa: Buffer.from(item.atqa || [0, 4]),
+            sak: Buffer.from([typeof item.sak === 'number' ? item.sak : 8])
           });
-          await ultra.cmdMf1WriteBlockData(Buffer.from(item.data.flat(Infinity)));
 
-          // 2. Configurazione LF (EMX Standard)
-          if (emxBytes) {
-            await ultra.cmdSlotSetTagType(slotsEnum[i], TagType.EM410X);
-            await ultra.cmdLfEm410xSetId(Buffer.from(emxBytes));
+          // 3. Scrivi i blocchi Mifare Classic
+          const flattenedData = item.data.flat(Infinity);
+          const dataBuf = Buffer.from(flattenedData);
+          if (typeof ultra.cmdMf1WriteBlockData === 'function') {
+            await ultra.cmdMf1WriteBlockData(dataBuf);
+          } else if (typeof ultra.cmdMf1WriteBlock === 'function') {
+            for (let b = 0; b < flattenedData.length / 16; b++) {
+              await ultra.cmdMf1WriteBlock(b, dataBuf.slice(b * 16, (b + 1) * 16));
+            }
           }
 
-          await ultra.cmdSlotSetEnable(slotsEnum[i], true);
+          // 4. Scrivi codice LF EMX se presente
+          let lfTag = TagType.UNKNOWN || 0;
+          if (emxBytes && typeof ultra.cmdLfEm410xSetId === 'function') {
+            await ultra.cmdLfEm410xSetId(Buffer.from(emxBytes));
+            lfTag = TagType.EM410X || 100;
+          }
+
+          // 5. Assegna i tipi di tag e abilita lo slot
+          const hfTag = item.tag || TagType.MIFARE_1024 || 1001;
+          await ultra.cmdSlotSetEnable(slot, hfTag, lfTag);
+
         } catch (err) {
           log(`Errore Slot ${i + 1}: ${err.message}`);
         }
