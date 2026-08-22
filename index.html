@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chameleon Ultra HF Manager</title>
+  <title>Chameleon Ultra — HF Group Manager</title>
   <style>
     :root {
       --bg: #0b1120;
@@ -95,7 +95,7 @@
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      min-height: 110px;
+      min-height: 115px;
     }
     .slot-card.empty { border-style: dashed; opacity: 0.6; align-items: center; justify-content: center; text-align: center; }
     .slot-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
@@ -121,7 +121,7 @@
       cursor: pointer;
     }
     .slot-btn:hover { background: #475569; color: #fff; }
-    .slot-btn-danger:hover { background: #dc2626; }
+    .slot-btn-danger:hover { background: #dc2626; color: #fff; }
     .slot-select {
       background: #334155;
       color: #cbd5e1;
@@ -150,8 +150,9 @@
 <body>
 
   <h1>Chameleon Ultra — HF Manager</h1>
-  <p class="subtitle">Caricamento rapido e gestione banchi Mifare Classic (13.56 MHz)</p>
+  <p class="subtitle">Gestione, ordinamento e scrittura selettiva banchi Mifare Classic</p>
 
+  <!-- Strumenti Globali -->
   <div class="tools-bar">
     <label class="btn btn-dark" style="cursor: pointer;">
       ⬆ Carica File JSON (Bulk)
@@ -166,8 +167,10 @@
     <button id="btnDisconnect" class="btn btn-red" style="display: none;">Disconnetti</button>
   </div>
 
+  <!-- Barra di selezione Gruppi -->
   <div class="group-nav" id="groupNav"></div>
 
+  <!-- Pannello del Gruppo Attivo -->
   <div class="group-panel">
     <div class="panel-header">
       <strong id="currentGroupName" style="color: #38bdf8; font-size: 1rem;">Gruppo 1</strong>
@@ -204,6 +207,7 @@
       Slot.SLOT_5, Slot.SLOT_6, Slot.SLOT_7, Slot.SLOT_8
     ];
 
+    // Inizializzazione 5 gruppi da 8 slot ciascuno
     let groups = [
       new Array(8).fill(null), new Array(8).fill(null),
       new Array(8).fill(null), new Array(8).fill(null),
@@ -280,6 +284,7 @@
     }
 
     function renderUI() {
+      // 1. Barra Navigazione Gruppi (G1..G5)
       groupNav.innerHTML = '';
       for (let i = 0; i < 5; i++) {
         const tab = document.createElement('div');
@@ -293,7 +298,10 @@
         groupNav.appendChild(tab);
       }
 
+      // 2. Titolo Gruppo
       currentGroupName.innerText = `Gruppo ${currentGroupIndex + 1}`;
+
+      // 3. Grid degli 8 Slot
       slotsGrid.innerHTML = '';
       const currentGroup = groups[currentGroupIndex];
 
@@ -340,6 +348,7 @@
         slotsGrid.appendChild(cardDiv);
       }
 
+      // 4. Gestione Eventi Slot
       slotsGrid.querySelectorAll('[data-action]').forEach(el => {
         const action = el.getAttribute('data-action');
         const slotIdx = parseInt(el.getAttribute('data-slot'));
@@ -403,6 +412,7 @@
       btnFlashGroup.disabled = !(ultra.isConnected && hasCards);
     }
 
+    // Caricamento Bulk (distribuisce da 1 a 40 file sui 5 gruppi)
     bulkInput.addEventListener('change', async (e) => {
       const files = Array.from(e.target.files).filter(f => f.name.endsWith('.json'));
       if (files.length === 0) return;
@@ -429,10 +439,11 @@
       });
 
       saveToStorage();
-      log(`Caricati ${allCards.length} file nei gruppi!`);
+      log(`Caricati ${allCards.length} file distribuiti nei 5 gruppi!`);
       bulkInput.value = '';
     });
 
+    // Riempi solo il gruppo attivo
     groupFileInput.addEventListener('change', async (e) => {
       const files = Array.from(e.target.files).filter(f => f.name.endsWith('.json'));
       files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
@@ -550,7 +561,7 @@
             await writeMf1BlockSafe(b, blockData);
           }
 
-          // 4. Abilita la frequenza HF e disabilita LF sullo slot
+          // 4. Abilita HF e disabilita LF
           await ultra.cmdSlotSetEnable(slot, TagFreq.HF, true);
           await ultra.cmdSlotSetEnable(slot, TagFreq.LF, false);
 
