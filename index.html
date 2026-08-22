@@ -9,12 +9,14 @@
       --bg: #0b1120;
       --card-bg: #1e293b;
       --accent: #0284c7;
+      --accent-hover: #0369a1;
       --success: #16a34a;
       --danger: #dc2626;
       --text: #f8fafc;
       --text-dim: #94a3b8;
       --border: #334155;
     }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: system-ui, -apple-system, sans-serif;
       background: var(--bg);
@@ -23,8 +25,8 @@
       max-width: 900px;
       margin: auto;
     }
-    h1 { font-size: 1.3rem; color: #38bdf8; margin: 0 0 4px 0; }
-    p.subtitle { color: var(--text-dim); font-size: 0.85rem; margin: 0 0 14px 0; }
+    h1 { font-size: 1.3rem; color: #38bdf8; margin-bottom: 4px; }
+    p.subtitle { color: var(--text-dim); font-size: 0.85rem; margin-bottom: 14px; }
     
     .btn {
       padding: 8px 12px;
@@ -34,6 +36,10 @@
       font-weight: 600;
       font-size: 0.8rem;
       transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
     }
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .btn-blue { background: var(--accent); color: white; }
@@ -54,20 +60,35 @@
       align-items: center;
     }
 
-    .group-nav { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 14px; }
+    .group-nav {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+      margin-bottom: 14px;
+    }
     .group-tab {
       background: var(--card-bg);
       border: 1px solid var(--border);
       color: var(--text-dim);
-      padding: 8px 4px;
-      border-radius: 6px;
-      font-size: 0.75rem;
+      padding: 10px 4px;
+      border-radius: 8px;
+      font-size: 0.8rem;
       font-weight: bold;
       text-align: center;
       cursor: pointer;
+      user-select: none;
     }
-    .group-tab.active { background: var(--accent); color: white; border-color: #38bdf8; }
-    .group-tab .count { display: block; font-size: 0.7rem; opacity: 0.8; margin-top: 2px; }
+    .group-tab.active {
+      background: var(--accent);
+      color: white;
+      border-color: #38bdf8;
+    }
+    .group-tab .count {
+      display: block;
+      font-size: 0.7rem;
+      opacity: 0.85;
+      margin-top: 3px;
+    }
 
     .group-panel {
       background: #131d31;
@@ -85,7 +106,11 @@
       margin-bottom: 12px;
     }
 
-    .slots-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+    .slots-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 10px;
+    }
     
     .slot-card {
       background: var(--card-bg);
@@ -95,12 +120,31 @@
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      min-height: 115px;
+      min-height: 125px;
     }
-    .slot-card.empty { border-style: dashed; opacity: 0.6; align-items: center; justify-content: center; text-align: center; }
-    .slot-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .slot-card.empty {
+      border-style: dashed;
+      opacity: 0.6;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    .slot-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
     .slot-num { font-weight: bold; color: #38bdf8; font-size: 0.75rem; }
-    .card-name { font-weight: 600; font-size: 0.85rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+    .card-name {
+      font-weight: 600;
+      font-size: 0.85rem;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 2px;
+    }
     .card-uid { font-family: monospace; font-size: 0.75rem; color: var(--text-dim); }
 
     .slot-actions {
@@ -127,7 +171,7 @@
       color: #cbd5e1;
       border: none;
       border-radius: 4px;
-      padding: 3px;
+      padding: 3px 4px;
       font-size: 0.7rem;
       cursor: pointer;
     }
@@ -144,22 +188,23 @@
       height: 100px;
       overflow-y: auto;
       margin-top: 14px;
+      white-space: pre-wrap;
     }
   </style>
 </head>
 <body>
 
   <h1>Chameleon Ultra — HF Manager</h1>
-  <p class="subtitle">Gestione, ordinamento e scrittura selettiva banchi Mifare Classic</p>
+  <p class="subtitle">Gestione 5 gruppi e scrittura rapida Mifare Classic (13.56 MHz)</p>
 
   <!-- Strumenti Globali -->
   <div class="tools-bar">
     <label class="btn btn-dark" style="cursor: pointer;">
-      ⬆ Carica File JSON (Bulk)
+      ⬆ Carica File JSON (Bulk 1-40)
       <input type="file" id="bulkInput" multiple accept=".json" style="display: none;">
     </label>
     <button id="btnExportPresets" class="btn btn-dark">⬇ Scarica presets.json</button>
-    <button id="btnResetPresets" class="btn btn-dark" title="Ricarica da presets.json originale">🔄 Ripristina</button>
+    <button id="btnResetPresets" class="btn btn-dark" title="Ricarica da presets.json su GitHub">🔄 Ripristina</button>
   </div>
 
   <div style="display: flex; gap: 8px; margin-bottom: 14px;">
@@ -167,7 +212,7 @@
     <button id="btnDisconnect" class="btn btn-red" style="display: none;">Disconnetti</button>
   </div>
 
-  <!-- Barra di selezione Gruppi -->
+  <!-- Barra di selezione Gruppi G1..G5 -->
   <div class="group-nav" id="groupNav"></div>
 
   <!-- Pannello del Gruppo Attivo -->
@@ -193,7 +238,7 @@
     </div>
   </div>
 
-  <div id="log">Pronto. In attesa di comandi...</div>
+  <div id="log">Inizializzazione in corso...</div>
 
   <script type="module">
     import { Buffer, ChameleonUltra, Slot, TagFreq } from 'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/+esm';
@@ -207,12 +252,15 @@
       Slot.SLOT_5, Slot.SLOT_6, Slot.SLOT_7, Slot.SLOT_8
     ];
 
-    // Inizializzazione 5 gruppi da 8 slot ciascuno
-    let groups = [
-      new Array(8).fill(null), new Array(8).fill(null),
-      new Array(8).fill(null), new Array(8).fill(null),
-      new Array(8).fill(null)
-    ];
+    function createEmptyGroups() {
+      return [
+        new Array(8).fill(null), new Array(8).fill(null),
+        new Array(8).fill(null), new Array(8).fill(null),
+        new Array(8).fill(null)
+      ];
+    }
+
+    let groups = createEmptyGroups();
     let currentGroupIndex = 0;
 
     const groupNav = document.getElementById('groupNav');
@@ -234,19 +282,53 @@
       logBox.scrollTop = logBox.scrollHeight;
     }
 
-    function normalizeGroupsData(rawData) {
-      const normalized = [];
-      const dataGroups = Array.isArray(rawData) ? rawData : (rawData.groups || []);
-      for (let g = 0; g < 5; g++) {
-        const groupArr = new Array(8).fill(null);
-        if (dataGroups[g] && Array.isArray(dataGroups[g])) {
-          for (let s = 0; s < 8; s++) {
-            groupArr[s] = dataGroups[g][s] || null;
-          }
-        }
-        normalized.push(groupArr);
+    // Normalizzatore universale dati
+    function normalizeGroupsData(raw) {
+      if (!raw) return createEmptyGroups();
+
+      // Caso 1: Oggetto con gruppi { gruppo_1: [...], gruppo_2: [...] }
+      if (raw.gruppo_1 || raw.gruppo_2) {
+        return [
+          padGroup(raw.gruppo_1), padGroup(raw.gruppo_2),
+          padGroup(raw.gruppo_3), padGroup(raw.gruppo_4),
+          padGroup(raw.gruppo_5)
+        ];
       }
-      return normalized;
+
+      // Caso 2: Oggetto con array { groups: [...] }
+      if (raw.groups && Array.isArray(raw.groups)) {
+        raw = raw.groups;
+      }
+
+      // Caso 3: Array di 5 sotto-array
+      if (Array.isArray(raw) && raw.length > 0 && Array.isArray(raw[0])) {
+        const out = [];
+        for (let i = 0; i < 5; i++) {
+          out.push(padGroup(raw[i]));
+        }
+        return out;
+      }
+
+      // Caso 4: Array piatto di 39/40 tag
+      if (Array.isArray(raw)) {
+        const out = [];
+        for (let i = 0; i < 5; i++) {
+          out.push(padGroup(raw.slice(i * 8, (i + 1) * 8)));
+        }
+        return out;
+      }
+
+      return createEmptyGroups();
+    }
+
+    function padGroup(arr) {
+      const g = new Array(8).fill(null);
+      if (Array.isArray(arr)) {
+        for (let i = 0; i < 8; i++) {
+          g[i] = arr[i] || null;
+        }
+      }
+      return g;
     }
 
     async function loadPresetsFromRemote() {
@@ -284,7 +366,7 @@
     }
 
     function renderUI() {
-      // 1. Barra Navigazione Gruppi (G1..G5)
+      // 1. Barra Navigazione 5 Gruppi
       groupNav.innerHTML = '';
       for (let i = 0; i < 5; i++) {
         const tab = document.createElement('div');
@@ -298,7 +380,7 @@
         groupNav.appendChild(tab);
       }
 
-      // 2. Titolo Gruppo
+      // 2. Intestazione Gruppo Attivo
       currentGroupName.innerText = `Gruppo ${currentGroupIndex + 1}`;
 
       // 3. Grid degli 8 Slot
@@ -326,7 +408,7 @@
               <button class="slot-btn" title="Sposta a destra" data-action="move-right" data-slot="${s}" ${s === 7 ? 'disabled' : ''}>▶</button>
               
               <select class="slot-select" data-action="move-group" data-slot="${s}">
-                <option value="" disabled selected>⇄ Gruppo</option>
+                <option value="" disabled selected>⇄ In G...</option>
                 ${[0,1,2,3,4].filter(g => g !== currentGroupIndex).map(g => `<option value="${g}">In G${g + 1}</option>`).join('')}
               </select>
 
@@ -348,7 +430,7 @@
         slotsGrid.appendChild(cardDiv);
       }
 
-      // 4. Gestione Eventi Slot
+      // 4. Listener eventi su ciascun slot
       slotsGrid.querySelectorAll('[data-action]').forEach(el => {
         const action = el.getAttribute('data-action');
         const slotIdx = parseInt(el.getAttribute('data-slot'));
@@ -385,7 +467,7 @@
               groups[targetGroup][freeIndex] = groups[currentGroupIndex][slotIdx];
               groups[currentGroupIndex][slotIdx] = null;
               saveToStorage();
-              log(`Card spostata in G${targetGroup + 1} (Slot ${freeIndex + 1})`);
+              log(`Card spostata da G${currentGroupIndex + 1} a G${targetGroup + 1} (Slot ${freeIndex + 1})`);
             } else {
               alert(`Il Gruppo ${targetGroup + 1} è già pieno (8/8)!`);
               renderUI();
@@ -412,7 +494,7 @@
       btnFlashGroup.disabled = !(ultra.isConnected && hasCards);
     }
 
-    // Caricamento Bulk (distribuisce da 1 a 40 file sui 5 gruppi)
+    // Caricamento Bulk (distribuisce da 1 a 40 file su G1..G5)
     bulkInput.addEventListener('change', async (e) => {
       const files = Array.from(e.target.files).filter(f => f.name.endsWith('.json'));
       if (files.length === 0) return;
@@ -426,12 +508,7 @@
         } catch (err) {}
       }
 
-      groups = [
-        new Array(8).fill(null), new Array(8).fill(null),
-        new Array(8).fill(null), new Array(8).fill(null),
-        new Array(8).fill(null)
-      ];
-
+      groups = createEmptyGroups();
       allCards.slice(0, 40).forEach((card, idx) => {
         const g = Math.floor(idx / 8);
         const s = idx % 8;
@@ -443,7 +520,7 @@
       bulkInput.value = '';
     });
 
-    // Riempi solo il gruppo attivo
+    // Riempi gruppo attivo
     groupFileInput.addEventListener('change', async (e) => {
       const files = Array.from(e.target.files).filter(f => f.name.endsWith('.json'));
       files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
@@ -461,7 +538,7 @@
     });
 
     btnResetPresets.addEventListener('click', async () => {
-      if (confirm("Ripristinare da presets.json originale?")) {
+      if (confirm("Ripristinare da presets.json su GitHub?")) {
         const ok = await loadPresetsFromRemote();
         if (ok) renderUI();
         else alert("Impossibile caricare presets.json.");
@@ -523,7 +600,7 @@
       }
     }
 
-    // Scrittura batch HF
+    // Scrittura batch HF su Chameleon
     btnFlashGroup.addEventListener('click', async () => {
       const activeCards = groups[currentGroupIndex];
       btnFlashGroup.disabled = true;
@@ -555,13 +632,13 @@
             sak: Buffer.from([typeof item.sak === 'number' ? item.sak : 8])
           });
 
-          // 3. Scrittura dei 64 blocchi Mifare Classic
+          // 3. Scrittura dei 64 blocchi Mifare Classic 1K
           for (let b = 0; b < 64; b++) {
             const blockData = item.data[b] || new Array(16).fill(0);
             await writeMf1BlockSafe(b, blockData);
           }
 
-          // 4. Abilita HF e disabilita LF
+          // 4. Abilita la frequenza HF e spegne LF
           await ultra.cmdSlotSetEnable(slot, TagFreq.HF, true);
           await ultra.cmdSlotSetEnable(slot, TagFreq.LF, false);
 
