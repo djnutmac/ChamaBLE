@@ -168,6 +168,7 @@
   <h1>Chameleon Ultra — Manager</h1>
   <p class="subtitle">Gestione, ordinamento e scrittura selettiva slot RFID</p>
 
+  <!-- Box LF EMX Master -->
   <div class="emx-box">
     <div>
       <div class="title">EMX Standard Master (LF 125kHz)</div>
@@ -179,6 +180,7 @@
     </div>
   </div>
 
+  <!-- Barra Strumenti e Sync -->
   <div class="tools-bar">
     <label class="btn btn-dark" style="cursor: pointer;">
       ⬆ Carica File JSON (Bulk)
@@ -219,8 +221,9 @@
 
   <div id="log">Pronto. In attesa di comandi...</div>
 
+  <!-- Import originali e puliti, IDENTICI al tuo file -->
   <script type="module">
-    import { Buffer, ChameleonUltra, Slot, TagType } from 'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/+esm';
+    import { Buffer, ChameleonUltra, FreqType, Slot, TagType } from 'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/+esm';
     import WebbleAdapter from 'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/plugin/WebbleAdapter/+esm';
 
     const ultra = new ChameleonUltra();
@@ -575,14 +578,7 @@
       }
     });
 
-    // -----------------------------------------------------------
-    // LOGICA DI SCRITTURA DEFINITIVA PER FIRMWARE 2.2
-    // -----------------------------------------------------------
-    
-    // Costanti assolute per evitare l'errore "Invalid freq" senza importare enum esterni
-    const FREQ_HF = 0;
-    const FREQ_LF = 1;
-
+    // SISTEMA DI SCRITTURA PULITO E COMPATIBILE CON FIRMWARE 2.2
     btnFlashGroup.addEventListener('click', async () => {
       const activeCards = groups[currentGroupIndex];
       btnFlashGroup.disabled = true;
@@ -594,11 +590,12 @@
         const item = activeCards[i];
         const slot = slotsEnum[i];
 
+        // Se lo slot è vuoto nel gruppo, disabilita entrambe le frequenze e lo salta
         if (!item) {
           try {
-            // Spegniamo entrambe le antenne sullo slot se vuoto
-            await ultra.cmdSlotSetEnable(slot, FREQ_HF, false);
-            await ultra.cmdSlotSetEnable(slot, FREQ_LF, false);
+            await ultra.cmdSlotSetEnable(slot, FreqType.HF, false);
+            await ultra.cmdSlotSetEnable(slot, FreqType.LF, false);
+            await ultra.cmdSlotSaveSettings();
             log(`Slot ${i + 1}: Disabilitato (vuoto)`);
           } catch (e) {}
           continue;
@@ -606,20 +603,27 @@
 
         log(`Slot ${i + 1}: Flash (${item.name || item.uid})...`);
         try {
-          // 1. IMPOSTA LO SLOT ATTIVO
-          if (typeof ultra.cmdSlotChangeActive === 'function') {
-            await ultra.cmdSlotChangeActive(slot);
-          } else if (typeof ultra.cmdSlotSetActive === 'function') {
-            await ultra.cmdSlotSetActive(slot);
-          } else if (typeof ultra.cmdSlotSetActiveSlot === 'function') {
-            await ultra.cmdSlotSetActiveSlot(slot);
+          const hfTag = item.tag || TagType.MIFARE_1024;
+          const hasLf = !!emxBytes;
+
+          // 1. IMPOSTA IL TIPO DI TAG HF SULLO SLOT E RESETTA I DATI DI DEFAULT
+          await ultra.cmdSlotChangeTagType(slot, hfTag);
+          await ultra.cmdSlotResetTagType(slot, hfTag);
+
+          // 2. IMPOSTA/PULISCE IL TIPO DI TAG LF SULLO SLOT
+          if (hasLf) {
+            await ultra.cmdSlotChangeTagType(slot, TagType.EM410X);
+            await ultra.cmdSlotResetTagType(slot, TagType.EM410X);
           }
 
-          // 2. DISABILITA LE ANTENNE DURANTE LA SCRITTURA
-          try { await ultra.cmdSlotSetEnable(slot, FREQ_HF, false); } catch(e){}
-          try { await ultra.cmdSlotSetEnable(slot, FREQ_LF, false); } catch(e){}
+          // 3. ABILITA LE FREQUENZE CORRETTE (freq, non tagType!)
+          await ultra.cmdSlotSetEnable(slot, FreqType.HF, true);
+          await ultra.cmdSlotSetEnable(slot, FreqType.LF, hasLf);
 
-          // 3. SCRIVI ANTICOLLISIONE HF (Mifare)
+          // 4. ATTIVA LO SLOT SELEZIONATO
+          await ultra.cmdSlotSetActive(slot);
+
+          // 5. SCRIVI L'ANTICOLLISIONE (HF)
           const uidBytes = item.uid.replace(/\s+/g, '').match(/.{1,2}/g).map(b => parseInt(b, 16));
           await ultra.cmdHf14aSetAntiCollData({
             uid: Buffer.from(uidBytes),
@@ -627,33 +631,20 @@
             sak: Buffer.from([typeof item.sak === 'number' ? item.sak : 8])
           });
 
-          // 4. SCRIVI I BLOCCHI MIFARE NELLA MEMORIA DELL'EMULATORE
+          // 6. SCRIVI I BLOCCHI IN MEMORIA EMULATORE
           for (let b = 0; b < 64; b++) {
             const blockData = item.data[b] || new Array(16).fill(0);
-            const blockBuf = Buffer.from(blockData);
-
-            if (typeof ultra.cmdMf1EmuWriteBlock === 'function') {
-              try { await ultra.cmdMf1EmuWriteBlock(b, blockBuf); }
-              catch(e) { await ultra.cmdMf1EmuWriteBlock({ block: b, data: blockBuf }); }
-            } else if (typeof ultra.cmdMf1SetBlockData === 'function') {
-              try { await ultra.cmdMf1SetBlockData(b, blockBuf); }
-              catch(e) { await ultra.cmdMf1SetBlockData({ block: b, data: blockBuf }); }
-            }
+            await ultra.cmdMf1EmuWriteBlock(b, Buffer.from(blockData));
           }
 
-          // 5. SCRIVI ID EMX (Se presente)
-          if (emxBytes) {
-            if (typeof ultra.cmdLfEm410xSetId === 'function') {
-              try { await ultra.cmdLfEm410xSetId(Buffer.from(emxBytes)); }
-              catch(e) { await ultra.cmdLfEm410xSetId({ id: Buffer.from(emxBytes) }); }
-            }
+          // 7. SCRIVI IDENTIFICATIVO EMX LF (se configurato)
+          if (hasLf) {
+            await ultra.cmdEm410xSetEmuId(Buffer.from(emxBytes));
           }
 
-          // 6. RIACCENDI LE ANTENNE SULLO SLOT
-          await ultra.cmdSlotSetEnable(slot, FREQ_HF, true);
-          if (emxBytes) {
-            await ultra.cmdSlotSetEnable(slot, FREQ_LF, true);
-          }
+          // 8. SALVA TUTTO IN MEMORIA PERSISTENTE
+          await ultra.cmdSlotSaveSettings();
+          log(`Slot ${i + 1}: Completato`);
 
         } catch (err) {
           log(`Errore Slot ${i + 1}: ${err.message}`);
