@@ -616,6 +616,21 @@
         log("Attenzione: impossibile confermare modalità TAG: " + e.message);
       }
 
+      // PULIZIA PRELIMINARE DI TUTTI GLI 8 SLOT FISICI.
+      // I "gruppi" esistono solo nella webapp: il device ha solo 8 slot reali.
+      // Disabilitando tutto prima di scrivere, se una scrittura dovesse fallire
+      // più avanti lo slot resta vuoto/disabilitato invece di mostrare dati
+      // "fantasma" rimasti da una sessione precedente con un gruppo diverso.
+      log("Pulizia preliminare di tutti gli slot fisici...");
+      for (let s = 0; s < 8; s++) {
+        try {
+          await ultra.cmdSlotSetEnable(slotsEnum[s], FreqType.HF, false);
+          await ultra.cmdSlotSetEnable(slotsEnum[s], FreqType.LF, false);
+        } catch (e) {}
+      }
+      try { await ultra.cmdSlotSaveSettings(); } catch (e) {}
+      await sleep(80);
+
       const emxBytes = masterEmxHex ? masterEmxHex.match(/.{1,2}/g).map(b => parseInt(b, 16)) : null;
 
       for (let i = 0; i < 8; i++) {
@@ -658,11 +673,16 @@
           // (senza questa attesa, su BLE può capitare che i comandi successivi
           // vengano ancora applicati allo slot precedente)
           await ultra.cmdSlotSetActive(slot);
-          const slotOk = await waitForActiveSlot(slot);
+          let slotOk = await waitForActiveSlot(slot);
           if (!slotOk) {
-            log(`Slot ${i + 1}: ATTENZIONE, il device non conferma lo slot attivo, riprovo...`);
+            log(`Slot ${i + 1}: il device non conferma lo slot attivo, riprovo...`);
             await ultra.cmdSlotSetActive(slot);
-            await waitForActiveSlot(slot, 15);
+            slotOk = await waitForActiveSlot(slot, 15);
+          }
+          if (!slotOk) {
+            // BLOCCO: se non riesco a confermare lo slot attivo NON scrivo,
+            // altrimenti rischio di sovrascrivere un altro slot (mai quello giusto).
+            throw new Error(`impossibile confermare lo slot attivo sul device, scrittura annullata per sicurezza`);
           }
           await sleep(30);
 
@@ -691,7 +711,8 @@
             await ultra.cmdHf14aSetAntiCollData(antiCollOpts);
             readBack = await ultra.cmdHf14aGetAntiCollData();
             if (!readBack || Buffer.compare(readBack.uid, antiCollOpts.uid) !== 0) {
-              log(`Slot ${i + 1}: ERRORE, UID ancora errato dopo il retry (atteso ${antiCollOpts.uid.toString('hex')}, letto ${readBack ? readBack.uid.toString('hex') : 'null'})`);
+              // BLOCCO: non proseguo a scrivere i blocchi se l'UID non è confermato.
+              throw new Error(`UID ancora errato dopo il retry (atteso ${antiCollOpts.uid.toString('hex')}, letto ${readBack ? readBack.uid.toString('hex') : 'null'}), scrittura annullata per sicurezza`);
             }
           }
 
