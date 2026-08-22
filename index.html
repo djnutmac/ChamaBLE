@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chameleon Ultra Group Manager</title>
+  <title>Chameleon Ultra Manager</title>
   <style>
     :root {
       --bg: #0b1120;
@@ -20,19 +20,19 @@
       background: var(--bg);
       color: var(--text);
       padding: 14px;
-      max-width: 850px;
+      max-width: 900px;
       margin: auto;
     }
     h1 { font-size: 1.3rem; color: #38bdf8; margin: 0 0 4px 0; }
-    p.subtitle { color: var(--text-dim); font-size: 0.85rem; margin: 0 0 16px 0; }
+    p.subtitle { color: var(--text-dim); font-size: 0.85rem; margin: 0 0 14px 0; }
     
     .btn {
-      padding: 9px 13px;
+      padding: 8px 12px;
       border: none;
-      border-radius: 8px;
+      border-radius: 6px;
       cursor: pointer;
       font-weight: 600;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       transition: all 0.2s;
     }
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -42,6 +42,33 @@
     .btn-dark:hover { background: #475569; }
     .btn-green { background: var(--success); color: white; width: 100%; font-size: 1rem; padding: 12px; margin-top: 10px; }
     
+    .emx-box {
+      background: #1e293b;
+      border: 1px solid #0284c7;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .emx-box .title { font-weight: bold; color: #38bdf8; font-size: 0.85rem; }
+    .emx-box .val { font-family: monospace; color: #a5f3fc; font-size: 0.8rem; }
+
+    .tools-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 14px;
+      align-items: center;
+    }
+
     .group-nav { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 14px; }
     .group-tab {
       background: var(--card-bg);
@@ -73,25 +100,53 @@
       margin-bottom: 12px;
     }
 
-    .slots-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
-    .slot-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px; font-size: 0.8rem; }
-    .slot-card.empty { border-style: dashed; opacity: 0.5; }
-    .slot-card .slot-num { font-weight: bold; color: #38bdf8; font-size: 0.75rem; }
-    .slot-card .card-name { font-weight: 600; margin: 4px 0; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .slot-card .card-uid { font-family: monospace; font-size: 0.7rem; color: var(--text-dim); }
-
-    .tools-bar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      background: #0f172a;
+    .slots-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+    
+    .slot-card {
+      background: var(--card-bg);
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 10px;
-      margin-bottom: 14px;
-      align-items: center;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 120px;
     }
-    .tools-bar span { font-size: 0.8rem; color: var(--text-dim); margin-right: auto; }
+    .slot-card.empty { border-style: dashed; opacity: 0.6; align-items: center; justify-content: center; text-align: center; }
+    .slot-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .slot-num { font-weight: bold; color: #38bdf8; font-size: 0.75rem; }
+    .card-name { font-weight: 600; font-size: 0.85rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+    .card-uid { font-family: monospace; font-size: 0.7rem; color: var(--text-dim); }
+    .badge-lf { display: inline-block; background: #0369a1; color: #e0f2fe; padding: 2px 5px; border-radius: 4px; font-size: 0.65rem; margin-top: 4px; }
+
+    .slot-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #334155;
+    }
+    .slot-btn {
+      background: #334155;
+      color: #cbd5e1;
+      border: none;
+      border-radius: 4px;
+      padding: 4px 6px;
+      font-size: 0.7rem;
+      cursor: pointer;
+    }
+    .slot-btn:hover { background: #475569; color: #fff; }
+    .slot-btn-danger:hover { background: #dc2626; }
+    .slot-select {
+      background: #334155;
+      color: #cbd5e1;
+      border: none;
+      border-radius: 4px;
+      padding: 3px;
+      font-size: 0.7rem;
+      cursor: pointer;
+    }
 
     .opt-row { margin-top: 10px; font-size: 0.85rem; color: var(--text-dim); display: flex; align-items: center; gap: 8px; }
     #log {
@@ -110,17 +165,32 @@
 </head>
 <body>
 
-  <h1>Chameleon Ultra — Group Manager</h1>
-  <p class="subtitle">Sincronizzazione GitHub e gestione banchi RFID</p>
+  <h1>Chameleon Ultra — Manager</h1>
+  <p class="subtitle">Gestione, ordinamento e scrittura selettiva slot RFID</p>
 
-  <!-- Barra Gestione File e Sync -->
+  <!-- Box LF EMX Master -->
+  <div class="emx-box">
+    <div>
+      <div class="title">EMX Standard Master (LF 125kHz)</div>
+      <div class="val" id="emxDisplay">Nessun ID configurato</div>
+    </div>
+    <div style="display: flex; gap: 6px;">
+      <label class="btn btn-dark" style="cursor: pointer; font-size: 0.75rem;">
+        Carica EMX (.json)
+        <input type="file" id="emxFileInput" accept=".json" style="display: none;">
+      </label>
+      <button id="btnPromptEmx" class="btn btn-dark" style="font-size: 0.75rem;">Inserisci Hex</button>
+    </div>
+  </div>
+
+  <!-- Barra Strumenti e Sync -->
   <div class="tools-bar">
-    <span>Configurazione:</span>
-    <button id="btnExportPresets" class="btn btn-dark">⬇ Scarica presets.json</button>
     <label class="btn btn-dark" style="cursor: pointer;">
-      ⬆ Carica tutti i 39 file
+      ⬆ Carica File JSON (Bulk)
       <input type="file" id="bulkInput" multiple accept=".json" style="display: none;">
     </label>
+    <button id="btnExportPresets" class="btn btn-dark">⬇ Scarica presets.json</button>
+    <button id="btnResetPresets" class="btn btn-dark" title="Ricarica da presets.json originale">🔄 Ripristina</button>
   </div>
 
   <div style="display: flex; gap: 8px; margin-bottom: 14px;">
@@ -132,13 +202,10 @@
 
   <div class="group-panel">
     <div class="panel-header">
-      <div>
-        <strong id="currentGroupName" style="color: #38bdf8; font-size: 1rem;">Gruppo 1</strong>
-        <span id="groupCapacityLabel" style="font-size: 0.8rem; color: var(--text-dim); margin-left: 6px;">(max 8 card)</span>
-      </div>
+      <strong id="currentGroupName" style="color: #38bdf8; font-size: 1rem;">Gruppo 1</strong>
       <div style="display: flex; gap: 6px;">
         <label class="btn btn-dark" style="cursor: pointer; font-size: 0.75rem; padding: 6px 10px;">
-          + Carica Gruppo
+          + Riempi Gruppo
           <input type="file" id="groupFileInput" multiple accept=".json" style="display: none;">
         </label>
         <button id="btnClearGroup" class="btn btn-red" style="padding: 6px 10px; font-size: 0.75rem;">Svuota</button>
@@ -151,11 +218,11 @@
     
     <div class="opt-row">
       <input type="checkbox" id="chkAutoDisconnect" checked>
-      <label for="chkAutoDisconnect">Disconnetti automaticamente il BLE a fine scrittura</label>
+      <label for="chkAutoDisconnect">Disconnetti automaticamente il BLE al termine del flash</label>
     </div>
   </div>
 
-  <div id="log">Caricamento in corso...</div>
+  <div id="log">Pronto. In attesa di comandi...</div>
 
   <script type="module">
     import { Buffer, ChameleonUltra, Slot, TagType } from 'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/+esm';
@@ -169,17 +236,27 @@
       Slot.SLOT_5, Slot.SLOT_6, Slot.SLOT_7, Slot.SLOT_8
     ];
 
-    const groupLimits = [8, 8, 8, 8, 7];
-    let groups = [[], [], [], [], []];
+    // 5 gruppi, ciascuno con esattamente 8 slot (null o dati tag)
+    let groups = [
+      new Array(8).fill(null),
+      new Array(8).fill(null),
+      new Array(8).fill(null),
+      new Array(8).fill(null),
+      new Array(8).fill(null)
+    ];
     let currentGroupIndex = 0;
+    let masterEmxHex = localStorage.getItem('cu_master_emx') || "";
 
     const groupNav = document.getElementById('groupNav');
     const slotsGrid = document.getElementById('slotsGrid');
     const currentGroupName = document.getElementById('currentGroupName');
-    const groupCapacityLabel = document.getElementById('groupCapacityLabel');
+    const emxDisplay = document.getElementById('emxDisplay');
+    const emxFileInput = document.getElementById('emxFileInput');
+    const btnPromptEmx = document.getElementById('btnPromptEmx');
     const groupFileInput = document.getElementById('groupFileInput');
     const bulkInput = document.getElementById('bulkInput');
     const btnExportPresets = document.getElementById('btnExportPresets');
+    const btnResetPresets = document.getElementById('btnResetPresets');
     const btnClearGroup = document.getElementById('btnClearGroup');
     const btnConnect = document.getElementById('btnConnect');
     const btnDisconnect = document.getElementById('btnDisconnect');
@@ -192,27 +269,90 @@
       logBox.scrollTop = logBox.scrollHeight;
     }
 
-    // Prova a recuperare presets.json da GitHub (con cache-busting per aggiornamenti rapidi)
-    async function initData() {
+    function updateEmxView() {
+      if (masterEmxHex) {
+        emxDisplay.innerHTML = `ID: <b>${masterEmxHex}</b> (attivo su tutti gli slot)`;
+      } else {
+        emxDisplay.innerText = "Nessun ID configurato (verrà scritta solo la parte HF)";
+      }
+    }
+
+    emxFileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const json = JSON.parse(text);
+        let uid = json.uid || (json.data ? json.data.map(b => b.toString(16).padStart(2, '0')).join('') : "");
+        uid = uid.replace(/[^a-fA-F0-9]/g, '').toUpperCase();
+        if (uid.length >= 10) {
+          masterEmxHex = uid.slice(0, 10);
+          localStorage.setItem('cu_master_emx', masterEmxHex);
+          updateEmxView();
+          renderUI();
+          log(`EMX Master salvato: ${masterEmxHex}`);
+        }
+      } catch (err) {
+        log(`Errore lettura file EMX: ${err.message}`);
+      }
+    });
+
+    btnPromptEmx.addEventListener('click', () => {
+      const input = prompt("Inserisci ID esadecimale (10 caratteri / 5 byte):", masterEmxHex);
+      if (input !== null) {
+        const clean = input.replace(/[^a-fA-F0-9]/g, '').toUpperCase();
+        if (clean.length === 10) {
+          masterEmxHex = clean;
+          localStorage.setItem('cu_master_emx', masterEmxHex);
+          updateEmxView();
+          renderUI();
+          log(`EMX Master impostato: ${masterEmxHex}`);
+        } else {
+          alert("L'ID deve contenere 10 cifre esadecimali.");
+        }
+      }
+    });
+
+    function normalizeGroupsData(rawData) {
+      const normalized = [];
+      for (let g = 0; g < 5; g++) {
+        const groupArr = new Array(8).fill(null);
+        if (rawData && rawData[g] && Array.isArray(rawData[g])) {
+          for (let s = 0; s < 8; s++) {
+            groupArr[s] = rawData[g][s] || null;
+          }
+        }
+        normalized.push(groupArr);
+      }
+      return normalized;
+    }
+
+    async function loadPresetsFromRemote() {
       try {
         const res = await fetch(`presets.json?t=${Date.now()}`);
         if (res.ok) {
-          groups = await res.json();
-          log("Configurazione sincronizzata da GitHub (presets.json)!");
-          renderUI();
-          return;
+          const raw = await res.json();
+          groups = normalizeGroupsData(raw);
+          saveToStorage();
+          log("Configurazione caricata da presets.json!");
+          return true;
         }
       } catch (e) {}
+      return false;
+    }
 
-      // Fallback su localStorage se presets.json non è ancora presente
+    async function initData() {
+      updateEmxView();
       const cached = localStorage.getItem('cu_user_groups');
       if (cached) {
         try {
-          groups = JSON.parse(cached);
+          groups = normalizeGroupsData(JSON.parse(cached));
           log("Dati caricati dalla memoria locale.");
-        } catch (e) { groups = [[], [], [], [], []]; }
+        } catch (e) {
+          await loadPresetsFromRemote();
+        }
       } else {
-        log("Pronto. Carica i file per iniziare.");
+        await loadPresetsFromRemote();
       }
       renderUI();
     }
@@ -222,14 +362,14 @@
       renderUI();
     }
 
+    // Render interfaccia e controlli di ciascun slot
     function renderUI() {
       groupNav.innerHTML = '';
       for (let i = 0; i < 5; i++) {
         const tab = document.createElement('div');
         tab.className = `group-tab ${i === currentGroupIndex ? 'active' : ''}`;
-        const count = groups[i]?.length || 0;
-        const max = groupLimits[i];
-        tab.innerHTML = `G${i + 1}<span class="count">${count}/${max}</span>`;
+        const count = groups[i].filter(x => x !== null).length;
+        tab.innerHTML = `G${i + 1}<span class="count">${count}/8</span>`;
         tab.addEventListener('click', () => {
           currentGroupIndex = i;
           renderUI();
@@ -238,46 +378,122 @@
       }
 
       currentGroupName.innerText = `Gruppo ${currentGroupIndex + 1}`;
-      groupCapacityLabel.innerText = `(max ${groupLimits[currentGroupIndex]} card)`;
-
       slotsGrid.innerHTML = '';
-      const activeCards = groups[currentGroupIndex] || [];
-      const limit = groupLimits[currentGroupIndex];
+      const currentGroup = groups[currentGroupIndex];
 
       for (let s = 0; s < 8; s++) {
-        const item = activeCards[s];
-        const isSupported = s < limit;
+        const item = currentGroup[s];
         const cardDiv = document.createElement('div');
         cardDiv.className = `slot-card ${item ? '' : 'empty'}`;
 
-        if (!isSupported) {
+        if (item) {
           cardDiv.innerHTML = `
-            <div class="slot-num" style="color: #64748b;">SLOT ${s + 1}</div>
-            <div class="card-name" style="color: #64748b;">Non usato (G5)</div>
-            <div class="card-uid">—</div>
-          `;
-        } else if (item) {
-          cardDiv.innerHTML = `
-            <div class="slot-num">SLOT ${s + 1}</div>
-            <div class="card-name">${item.name || 'Senza Nome'}</div>
-            <div class="card-uid">${item.uid}</div>
+            <div>
+              <div class="slot-top">
+                <span class="slot-num">SLOT ${s + 1}</span>
+                <button class="slot-btn slot-btn-danger" title="Elimina slot" data-action="delete" data-slot="${s}">🗑️</button>
+              </div>
+              <div class="card-name" title="${item.name || 'Senza Nome'}">${item.name || 'Senza Nome'}</div>
+              <div class="card-uid">HF: ${item.uid}</div>
+              ${masterEmxHex ? `<div class="badge-lf">LF: ${masterEmxHex}</div>` : ''}
+            </div>
+            
+            <div class="slot-actions">
+              <button class="slot-btn" title="Sposta a sinistra" data-action="move-left" data-slot="${s}" ${s === 0 ? 'disabled' : ''}>◀</button>
+              <button class="slot-btn" title="Sposta a destra" data-action="move-right" data-slot="${s}" ${s === 7 ? 'disabled' : ''}>▶</button>
+              
+              <select class="slot-select" data-action="move-group" data-slot="${s}">
+                <option value="" disabled selected>⇄ Gruppo</option>
+                ${[0,1,2,3,4].filter(g => g !== currentGroupIndex).map(g => `<option value="${g}">In G${g + 1}</option>`).join('')}
+              </select>
+
+              <label class="slot-btn" style="cursor: pointer;" title="Sostituisci file">
+                📁
+                <input type="file" accept=".json" style="display: none;" data-action="replace-file" data-slot="${s}">
+              </label>
+            </div>
           `;
         } else {
           cardDiv.innerHTML = `
-            <div class="slot-num">SLOT ${s + 1}</div>
-            <div class="card-name" style="color: var(--text-dim);">Vuoto</div>
-            <div class="card-uid">—</div>
+            <div class="slot-num" style="margin-bottom: 6px;">SLOT ${s + 1} (Vuoto)</div>
+            <label class="btn btn-dark" style="cursor: pointer; font-size: 0.75rem;">
+              + Carica JSON
+              <input type="file" accept=".json" style="display: none;" data-action="single-upload" data-slot="${s}">
+            </label>
           `;
         }
         slotsGrid.appendChild(cardDiv);
       }
 
-      btnFlashGroup.disabled = !(ultra.isConnected && activeCards.length > 0);
+      // Listener delegati per azioni slot
+      slotsGrid.querySelectorAll('[data-action]').forEach(el => {
+        const action = el.getAttribute('data-action');
+        const slotIdx = parseInt(el.getAttribute('data-slot'));
+
+        if (action === 'delete') {
+          el.addEventListener('click', () => {
+            groups[currentGroupIndex][slotIdx] = null;
+            saveToStorage();
+            log(`Slot ${slotIdx + 1} svuotato.`);
+          });
+        } else if (action === 'move-left') {
+          el.addEventListener('click', () => {
+            if (slotIdx > 0) {
+              const temp = groups[currentGroupIndex][slotIdx];
+              groups[currentGroupIndex][slotIdx] = groups[currentGroupIndex][slotIdx - 1];
+              groups[currentGroupIndex][slotIdx - 1] = temp;
+              saveToStorage();
+            }
+          });
+        } else if (action === 'move-right') {
+          el.addEventListener('click', () => {
+            if (slotIdx < 7) {
+              const temp = groups[currentGroupIndex][slotIdx];
+              groups[currentGroupIndex][slotIdx] = groups[currentGroupIndex][slotIdx + 1];
+              groups[currentGroupIndex][slotIdx + 1] = temp;
+              saveToStorage();
+            }
+          });
+        } else if (action === 'move-group') {
+          el.addEventListener('change', (e) => {
+            const targetGroup = parseInt(e.target.value);
+            // Trova primo slot libero nel gruppo target
+            const freeIndex = groups[targetGroup].findIndex(x => x === null);
+            if (freeIndex !== -1) {
+              groups[targetGroup][freeIndex] = groups[currentGroupIndex][slotIdx];
+              groups[currentGroupIndex][slotIdx] = null;
+              saveToStorage();
+              log(`Card spostata da G${currentGroupIndex + 1} a G${targetGroup + 1} (Slot ${freeIndex + 1})`);
+            } else {
+              alert(`Il Gruppo ${targetGroup + 1} è già pieno (8/8)!`);
+              renderUI();
+            }
+          });
+        } else if (action === 'single-upload' || action === 'replace-file') {
+          el.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            try {
+              const text = await file.text();
+              const json = JSON.parse(text);
+              groups[currentGroupIndex][slotIdx] = json;
+              saveToStorage();
+              log(`File caricato nello Slot ${slotIdx + 1} (G${currentGroupIndex + 1})`);
+            } catch (err) {
+              log(`Errore lettura file: ${err.message}`);
+            }
+          });
+        }
+      });
+
+      const hasCards = groups[currentGroupIndex].some(x => x !== null);
+      btnFlashGroup.disabled = !(ultra.isConnected && hasCards);
     }
 
-    // Caricamento Bulk di tutti i 39 file contemporaneamente
+    // Caricamento Bulk (da 1 a 40 file distribuiti)
     bulkInput.addEventListener('change', async (e) => {
       const files = Array.from(e.target.files).filter(f => f.name.endsWith('.json'));
+      if (files.length === 0) return;
       files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 
       const allCards = [];
@@ -285,47 +501,53 @@
         try {
           const text = await f.text();
           allCards.push(JSON.parse(text));
-        } catch (err) {
-          log(`Errore lettura: ${f.name}`);
-        }
+        } catch (err) {}
       }
 
       groups = [
-        allCards.slice(0, 8),
-        allCards.slice(8, 16),
-        allCards.slice(16, 24),
-        allCards.slice(24, 32),
-        allCards.slice(32, 39)
+        new Array(8).fill(null), new Array(8).fill(null),
+        new Array(8).fill(null), new Array(8).fill(null),
+        new Array(8).fill(null)
       ];
 
+      allCards.slice(0, 40).forEach((card, idx) => {
+        const g = Math.floor(idx / 8);
+        const s = idx % 8;
+        groups[g][s] = card;
+      });
+
       saveToStorage();
-      log(`Importati ${allCards.length} file e distribuiti nei 5 gruppi!`);
+      log(`Caricati ${allCards.length} file distribuiti nei 5 gruppi!`);
       bulkInput.value = '';
     });
 
-    // Caricamento selettivo per singolo gruppo
+    // Riempi gruppo attivo
     groupFileInput.addEventListener('change', async (e) => {
       const files = Array.from(e.target.files).filter(f => f.name.endsWith('.json'));
-      const limit = groupLimits[currentGroupIndex];
       files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 
-      const loadedCards = [];
-      for (let f of files.slice(0, limit)) {
+      for (let i = 0; i < Math.min(files.length, 8); i++) {
         try {
-          const text = await f.text();
-          loadedCards.push(JSON.parse(text));
-        } catch (err) {
-          log(`Errore lettura: ${f.name}`);
-        }
+          const text = await files[i].text();
+          groups[currentGroupIndex][i] = JSON.parse(text);
+        } catch (err) {}
       }
 
-      groups[currentGroupIndex] = loadedCards;
       saveToStorage();
-      log(`Caricati ${loadedCards.length} file nel Gruppo ${currentGroupIndex + 1}.`);
+      log(`Gruppo ${currentGroupIndex + 1} popolato con ${files.length} card.`);
       groupFileInput.value = '';
     });
 
-    // Esporta presets.json per caricarlo su GitHub
+    // Reset da presets.json
+    btnResetPresets.addEventListener('click', async () => {
+      if (confirm("Vuoi ripristinare i gruppi dal file presets.json originale?")) {
+        const ok = await loadPresetsFromRemote();
+        if (ok) renderUI();
+        else alert("Impossibile caricare presets.json dal server.");
+      }
+    });
+
+    // Esporta presets.json modificato
     btnExportPresets.addEventListener('click', () => {
       const jsonStr = JSON.stringify(groups, null, 2);
       const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -335,14 +557,13 @@
       a.download = 'presets.json';
       a.click();
       URL.revokeObjectURL(url);
-      log("File presets.json scaricato! Caricalo nella tua repo GitHub.");
+      log("File presets.json esportato!");
     });
 
     btnClearGroup.addEventListener('click', () => {
-      if (confirm(`Svuotare Gruppo ${currentGroupIndex + 1}?`)) {
-        groups[currentGroupIndex] = [];
+      if (confirm(`Svuotare tutti gli slot del Gruppo ${currentGroupIndex + 1}?`)) {
+        groups[currentGroupIndex] = new Array(8).fill(null);
         saveToStorage();
-        log(`Gruppo ${currentGroupIndex + 1} svuotato.`);
       }
     });
 
@@ -351,7 +572,7 @@
       try {
         log("Ricerca Chameleon Ultra BLE...");
         await ultra.connect();
-        log("Chameleon Ultra Connesso!");
+        log("Chameleon Ultra Connesso via BLE!");
         btnConnect.style.display = "none";
         btnDisconnect.style.display = "inline-block";
         renderUI();
@@ -372,26 +593,27 @@
       }
     });
 
-    // Flashing del gruppo attivo
+    // Flashing DUAL (HF + LF)
     btnFlashGroup.addEventListener('click', async () => {
-      const activeCards = groups[currentGroupIndex] || [];
-      if (activeCards.length === 0) return;
-
+      const activeCards = groups[currentGroupIndex];
       btnFlashGroup.disabled = true;
       log(`Scrittura Gruppo ${currentGroupIndex + 1}...`);
+
+      const emxBytes = masterEmxHex ? masterEmxHex.match(/.{1,2}/g).map(b => parseInt(b, 16)) : null;
 
       for (let i = 0; i < 8; i++) {
         const item = activeCards[i];
 
+        // Se lo slot è null, viene disabilitato fisicamente
         if (!item) {
           try {
             await ultra.cmdSlotSetEnable(slotsEnum[i], false);
-            log(`Slot ${i + 1}: Disabilitato`);
+            log(`Slot ${i + 1}: Disabilitato (vuoto)`);
           } catch (e) {}
           continue;
         }
 
-        log(`Scrittura Slot ${i + 1}: ${item.name || item.uid}...`);
+        log(`Slot ${i + 1}: Flash HF (${item.name || item.uid})...`);
         try {
           await ultra.cmdSlotSetTagType(slotsEnum[i], item.tag || TagType.MIFARE_1024);
           await ultra.cmdSlotSetActiveSlot(slotsEnum[i]);
@@ -402,8 +624,13 @@
             atqa: Buffer.from(item.atqa),
             sak: Buffer.from([item.sak])
           });
-
           await ultra.cmdMf1WriteBlockData(Buffer.from(item.data.flat()));
+
+          if (emxBytes) {
+            await ultra.cmdSlotSetTagType(slotsEnum[i], TagType.EM410X);
+            await ultra.cmdLfEm410xSetId(Buffer.from(emxBytes));
+          }
+
           await ultra.cmdSlotSetEnable(slotsEnum[i], true);
         } catch (err) {
           log(`Errore Slot ${i + 1}: ${err.message}`);
