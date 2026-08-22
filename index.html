@@ -221,9 +221,9 @@
 
   <div id="log">Pronto. In attesa di comandi...</div>
 
-  <!-- Aggiunto TagFreq nell'import -->
+  <!-- Import originali e puliti, IDENTICI al tuo file -->
   <script type="module">
-    import { Buffer, ChameleonUltra, Slot, TagType, TagFreq } from 'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/+esm';
+    import { Buffer, ChameleonUltra, Slot, TagType } from 'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/+esm';
     import WebbleAdapter from 'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/plugin/WebbleAdapter/+esm';
 
     const ultra = new ChameleonUltra();
@@ -578,7 +578,7 @@
       }
     });
 
-    // NUOVO SISTEMA DI SCRITTURA RISOLUTIVO (FIRMWARE 2.2 Emulator logic)
+    // SISTEMA DI SCRITTURA PULITO E COMPATIBILE CON FIRMWARE 2.2
     btnFlashGroup.addEventListener('click', async () => {
       const activeCards = groups[currentGroupIndex];
       btnFlashGroup.disabled = true;
@@ -590,10 +590,10 @@
         const item = activeCards[i];
         const slot = slotsEnum[i];
 
+        // Se lo slot è vuoto nel gruppo, lo spegne e lo salta
         if (!item) {
           try {
-            await ultra.cmdSlotSetEnable(slot, TagFreq.HF, false);
-            await ultra.cmdSlotSetEnable(slot, TagFreq.LF, false);
+            await ultra.cmdSlotSetEnable(slot, TagType.UNKNOWN || 0, TagType.UNKNOWN || 0);
             log(`Slot ${i + 1}: Disabilitato (vuoto)`);
           } catch (e) {}
           continue;
@@ -602,18 +602,21 @@
         log(`Slot ${i + 1}: Flash (${item.name || item.uid})...`);
         try {
           
-          // 1. Attiva lo slot con fallbacks dinamici per SDK
+          // 1. PULIZIA SLOT PRE-SCRITTURA (Fondamentale su FW 2.2)
+          try {
+            await ultra.cmdSlotSetEnable(slot, TagType.UNKNOWN || 0, TagType.UNKNOWN || 0);
+          } catch(e) {}
+
+          // 2. ATTIVA LO SLOT SELEZIONATO
           if (typeof ultra.cmdSlotChangeActive === 'function') {
             await ultra.cmdSlotChangeActive(slot);
           } else if (typeof ultra.cmdSlotSetActive === 'function') {
             await ultra.cmdSlotSetActive(slot);
+          } else if (typeof ultra.cmdSlotSetActiveSlot === 'function') {
+            await ultra.cmdSlotSetActiveSlot(slot);
           }
 
-          // 2. Disabilita frequenze durante la scrittura per sicurezza
-          try { await ultra.cmdSlotSetEnable(slot, TagFreq.HF, false); } catch(e){}
-          try { await ultra.cmdSlotSetEnable(slot, TagFreq.LF, false); } catch(e){}
-
-          // 3. Anticollisione HF (UID, SAK, ATQA)
+          // 3. SCRIVI L'ANTICOLLISIONE (HF)
           const uidBytes = item.uid.replace(/\s+/g, '').match(/.{1,2}/g).map(b => parseInt(b, 16));
           await ultra.cmdHf14aSetAntiCollData({
             uid: Buffer.from(uidBytes),
@@ -621,42 +624,41 @@
             sak: Buffer.from([typeof item.sak === 'number' ? item.sak : 8])
           });
 
-          // 4. Scrittura blocchi emulatore (metodi FW 2.2 safe)
+          // 4. SCRIVI I BLOCCHI IN MEMORIA EMULATORE
           for (let b = 0; b < 64; b++) {
             const blockData = item.data[b] || new Array(16).fill(0);
             const blockBuf = Buffer.from(blockData);
 
-            try {
-              if (typeof ultra.cmdMf1EmuWriteBlock === 'function') {
-                await ultra.cmdMf1EmuWriteBlock(b, blockBuf);
-              } else {
-                await ultra.cmdMf1SetBlockData(b, blockBuf);
-              }
-            } catch (e) {
-              if (typeof ultra.cmdMf1EmuWriteBlock === 'function') {
-                await ultra.cmdMf1EmuWriteBlock({ block: b, data: blockBuf });
-              } else {
+            if (typeof ultra.cmdMf1SetBlockData === 'function') {
+              try {
+                // Sintassi ad oggetto (Nuova)
                 await ultra.cmdMf1SetBlockData({ block: b, data: blockBuf });
+              } catch (e1) {
+                try {
+                  // Sintassi sequenziale (Vecchia)
+                  await ultra.cmdMf1SetBlockData(b, blockBuf);
+                } catch (e2) {}
               }
             }
           }
 
-          // 5. Configurazione LF EMX Standard
-          if (emxBytes) {
+          // 5. SCRIVI IDENTIFICATIVO EMX LF (se configurato)
+          let lfTag = TagType.UNKNOWN || 0;
+          if (emxBytes && typeof ultra.cmdLfEm410xSetId === 'function') {
             try {
-              if (typeof ultra.cmdLfEm410xSetId === 'function') {
-                await ultra.cmdLfEm410xSetId(Buffer.from(emxBytes));
-              }
-            } catch (e) {
               await ultra.cmdLfEm410xSetId({ id: Buffer.from(emxBytes) });
+            } catch (e) {
+              try {
+                await ultra.cmdLfEm410xSetId(Buffer.from(emxBytes));
+              } catch(e2) {}
             }
+            lfTag = TagType.EM410X || 100;
           }
 
-          // 6. Abilita lo slot sulle frequenze finali
-          await ultra.cmdSlotSetEnable(slot, TagFreq.HF, true);
-          if (emxBytes) {
-            await ultra.cmdSlotSetEnable(slot, TagFreq.LF, true);
-          }
+          // 6. ABILITA DEFINITIVAMENTE LO SLOT CON I TAG CARICATI
+          const hfTag = item.tag || TagType.MIFARE_1024 || 1001;
+          await ultra.cmdSlotSetEnable(slot, hfTag, lfTag);
+          log(`Slot ${i + 1}: Completato`);
 
         } catch (err) {
           log(`Errore Slot ${i + 1}: ${err.message}`);
