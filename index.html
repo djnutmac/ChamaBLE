@@ -27,17 +27,19 @@
     p.subtitle { color: var(--text-dim); font-size: 0.85rem; margin: 0 0 16px 0; }
     
     .btn {
-      padding: 10px 14px;
+      padding: 9px 13px;
       border: none;
       border-radius: 8px;
       cursor: pointer;
       font-weight: 600;
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       transition: all 0.2s;
     }
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .btn-blue { background: var(--accent); color: white; }
     .btn-red { background: var(--danger); color: white; }
+    .btn-dark { background: #334155; color: #f8fafc; }
+    .btn-dark:hover { background: #475569; }
     .btn-green { background: var(--success); color: white; width: 100%; font-size: 1rem; padding: 12px; margin-top: 10px; }
     
     .group-nav { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 14px; }
@@ -70,15 +72,6 @@
       gap: 8px;
       margin-bottom: 12px;
     }
-    .file-btn {
-      background: #334155;
-      color: #f8fafc;
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 0.8rem;
-      font-weight: 600;
-      cursor: pointer;
-    }
 
     .slots-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
     .slot-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px; font-size: 0.8rem; }
@@ -86,6 +79,19 @@
     .slot-card .slot-num { font-weight: bold; color: #38bdf8; font-size: 0.75rem; }
     .slot-card .card-name { font-weight: 600; margin: 4px 0; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .slot-card .card-uid { font-family: monospace; font-size: 0.7rem; color: var(--text-dim); }
+
+    .tools-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 14px;
+      align-items: center;
+    }
+    .tools-bar span { font-size: 0.8rem; color: var(--text-dim); margin-right: auto; }
 
     .opt-row { margin-top: 10px; font-size: 0.85rem; color: var(--text-dim); display: flex; align-items: center; gap: 8px; }
     #log {
@@ -104,8 +110,18 @@
 </head>
 <body>
 
-  <h1>Chameleon Ultra — Multi-Group BLE</h1>
-  <p class="subtitle">Gestione e caricamento selettivo banchi RFID</p>
+  <h1>Chameleon Ultra — Group Manager</h1>
+  <p class="subtitle">Sincronizzazione GitHub e gestione banchi RFID</p>
+
+  <!-- Barra Gestione File e Sync -->
+  <div class="tools-bar">
+    <span>Configurazione:</span>
+    <button id="btnExportPresets" class="btn btn-dark">⬇ Scarica presets.json</button>
+    <label class="btn btn-dark" style="cursor: pointer;">
+      ⬆ Carica tutti i 39 file
+      <input type="file" id="bulkInput" multiple accept=".json" style="display: none;">
+    </label>
+  </div>
 
   <div style="display: flex; gap: 8px; margin-bottom: 14px;">
     <button id="btnConnect" class="btn btn-blue">1. Connetti BLE ᛒ</button>
@@ -121,8 +137,8 @@
         <span id="groupCapacityLabel" style="font-size: 0.8rem; color: var(--text-dim); margin-left: 6px;">(max 8 card)</span>
       </div>
       <div style="display: flex; gap: 6px;">
-        <label class="file-btn">
-          + Carica File JSON
+        <label class="btn btn-dark" style="cursor: pointer; font-size: 0.75rem; padding: 6px 10px;">
+          + Carica Gruppo
           <input type="file" id="groupFileInput" multiple accept=".json" style="display: none;">
         </label>
         <button id="btnClearGroup" class="btn btn-red" style="padding: 6px 10px; font-size: 0.75rem;">Svuota</button>
@@ -135,11 +151,11 @@
     
     <div class="opt-row">
       <input type="checkbox" id="chkAutoDisconnect" checked>
-      <label for="chkAutoDisconnect">Disconnetti automaticamente il BLE al termine del flash</label>
+      <label for="chkAutoDisconnect">Disconnetti automaticamente il BLE a fine scrittura</label>
     </div>
   </div>
 
-  <div id="log">In attesa di connessione BLE...</div>
+  <div id="log">Caricamento in corso...</div>
 
   <script type="module">
     import { Buffer, ChameleonUltra, Slot, TagType } from 'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/+esm';
@@ -162,6 +178,8 @@
     const currentGroupName = document.getElementById('currentGroupName');
     const groupCapacityLabel = document.getElementById('groupCapacityLabel');
     const groupFileInput = document.getElementById('groupFileInput');
+    const bulkInput = document.getElementById('bulkInput');
+    const btnExportPresets = document.getElementById('btnExportPresets');
     const btnClearGroup = document.getElementById('btnClearGroup');
     const btnConnect = document.getElementById('btnConnect');
     const btnDisconnect = document.getElementById('btnDisconnect');
@@ -174,11 +192,29 @@
       logBox.scrollTop = logBox.scrollHeight;
     }
 
-    function loadFromStorage() {
-      const data = localStorage.getItem('cu_user_groups');
-      if (data) {
-        try { groups = JSON.parse(data); } catch (e) { groups = [[], [], [], [], []]; }
+    // Prova a recuperare presets.json da GitHub (con cache-busting per aggiornamenti rapidi)
+    async function initData() {
+      try {
+        const res = await fetch(`presets.json?t=${Date.now()}`);
+        if (res.ok) {
+          groups = await res.json();
+          log("Configurazione sincronizzata da GitHub (presets.json)!");
+          renderUI();
+          return;
+        }
+      } catch (e) {}
+
+      // Fallback su localStorage se presets.json non è ancora presente
+      const cached = localStorage.getItem('cu_user_groups');
+      if (cached) {
+        try {
+          groups = JSON.parse(cached);
+          log("Dati caricati dalla memoria locale.");
+        } catch (e) { groups = [[], [], [], [], []]; }
+      } else {
+        log("Pronto. Carica i file per iniziare.");
       }
+      renderUI();
     }
 
     function saveToStorage() {
@@ -210,14 +246,14 @@
 
       for (let s = 0; s < 8; s++) {
         const item = activeCards[s];
-        const isSupportedByGroup = s < limit;
+        const isSupported = s < limit;
         const cardDiv = document.createElement('div');
         cardDiv.className = `slot-card ${item ? '' : 'empty'}`;
 
-        if (!isSupportedByGroup) {
+        if (!isSupported) {
           cardDiv.innerHTML = `
             <div class="slot-num" style="color: #64748b;">SLOT ${s + 1}</div>
-            <div class="card-name" style="color: #64748b;">Disabilitato</div>
+            <div class="card-name" style="color: #64748b;">Non usato (G5)</div>
             <div class="card-uid">—</div>
           `;
         } else if (item) {
@@ -239,6 +275,35 @@
       btnFlashGroup.disabled = !(ultra.isConnected && activeCards.length > 0);
     }
 
+    // Caricamento Bulk di tutti i 39 file contemporaneamente
+    bulkInput.addEventListener('change', async (e) => {
+      const files = Array.from(e.target.files).filter(f => f.name.endsWith('.json'));
+      files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+      const allCards = [];
+      for (let f of files) {
+        try {
+          const text = await f.text();
+          allCards.push(JSON.parse(text));
+        } catch (err) {
+          log(`Errore lettura: ${f.name}`);
+        }
+      }
+
+      groups = [
+        allCards.slice(0, 8),
+        allCards.slice(8, 16),
+        allCards.slice(16, 24),
+        allCards.slice(24, 32),
+        allCards.slice(32, 39)
+      ];
+
+      saveToStorage();
+      log(`Importati ${allCards.length} file e distribuiti nei 5 gruppi!`);
+      bulkInput.value = '';
+    });
+
+    // Caricamento selettivo per singolo gruppo
     groupFileInput.addEventListener('change', async (e) => {
       const files = Array.from(e.target.files).filter(f => f.name.endsWith('.json'));
       const limit = groupLimits[currentGroupIndex];
@@ -250,7 +315,7 @@
           const text = await f.text();
           loadedCards.push(JSON.parse(text));
         } catch (err) {
-          log(`Errore lettura file ${f.name}`);
+          log(`Errore lettura: ${f.name}`);
         }
       }
 
@@ -260,8 +325,21 @@
       groupFileInput.value = '';
     });
 
+    // Esporta presets.json per caricarlo su GitHub
+    btnExportPresets.addEventListener('click', () => {
+      const jsonStr = JSON.stringify(groups, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'presets.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      log("File presets.json scaricato! Caricalo nella tua repo GitHub.");
+    });
+
     btnClearGroup.addEventListener('click', () => {
-      if (confirm(`Vuoi svuotare il Gruppo ${currentGroupIndex + 1}?`)) {
+      if (confirm(`Svuotare Gruppo ${currentGroupIndex + 1}?`)) {
         groups[currentGroupIndex] = [];
         saveToStorage();
         log(`Gruppo ${currentGroupIndex + 1} svuotato.`);
@@ -273,7 +351,7 @@
       try {
         log("Ricerca Chameleon Ultra BLE...");
         await ultra.connect();
-        log("Dispositivo BLE connesso!");
+        log("Chameleon Ultra Connesso!");
         btnConnect.style.display = "none";
         btnDisconnect.style.display = "inline-block";
         renderUI();
@@ -282,11 +360,10 @@
       }
     });
 
-    // Disconnessione Manuale
     btnDisconnect.addEventListener('click', async () => {
       try {
         await ultra.disconnect();
-        log("Chameleon disconnesso con successo.");
+        log("Chameleon disconnesso.");
         btnConnect.style.display = "inline-block";
         btnDisconnect.style.display = "none";
         renderUI();
@@ -295,13 +372,13 @@
       }
     });
 
-    // Scrittura batch e auto-disconnect opzionale
+    // Flashing del gruppo attivo
     btnFlashGroup.addEventListener('click', async () => {
       const activeCards = groups[currentGroupIndex] || [];
       if (activeCards.length === 0) return;
 
       btnFlashGroup.disabled = true;
-      log(`Avvio sovrascrittura Gruppo ${currentGroupIndex + 1}...`);
+      log(`Scrittura Gruppo ${currentGroupIndex + 1}...`);
 
       for (let i = 0; i < 8; i++) {
         const item = activeCards[i];
@@ -314,7 +391,7 @@
           continue;
         }
 
-        log(`Scrittura Slot ${i + 1} (${item.name || item.uid})...`);
+        log(`Scrittura Slot ${i + 1}: ${item.name || item.uid}...`);
         try {
           await ultra.cmdSlotSetTagType(slotsEnum[i], item.tag || TagType.MIFARE_1024);
           await ultra.cmdSlotSetActiveSlot(slotsEnum[i]);
@@ -335,11 +412,10 @@
 
       log(`Gruppo ${currentGroupIndex + 1} scritto con successo!`);
 
-      // Se spuntato, disconnette automaticamente il Bluetooth per uso autonomo
       if (chkAutoDisconnect.checked) {
         try {
           await ultra.disconnect();
-          log("BLE disconnesso automaticamente. Il Chameleon è pronto all'uso.");
+          log("BLE disconnesso automaticamente.");
           btnConnect.style.display = "inline-block";
           btnDisconnect.style.display = "none";
         } catch (e) {}
@@ -348,8 +424,7 @@
       renderUI();
     });
 
-    loadFromStorage();
-    renderUI();
+    initData();
   </script>
 </body>
 </html>
