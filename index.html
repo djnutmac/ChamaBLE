@@ -577,7 +577,31 @@
       }
     });
 
-    // Scrittura batch corretta
+    // Helper universali per l'invio comandi
+    async function setSlotActive(slot) {
+      if (typeof ultra.cmdSlotSetActive === 'function') {
+        return await ultra.cmdSlotSetActive(slot);
+      } else if (typeof ultra.cmdSlotSetActiveSlot === 'function') {
+        return await ultra.cmdSlotSetActiveSlot(slot);
+      } else if (typeof ultra.cmdSlotChangeActive === 'function') {
+        return await ultra.cmdSlotChangeActive(slot);
+      }
+    }
+
+    async function writeMf1BlockData(flatBlocks) {
+      const buf = Buffer.from(flatBlocks);
+      if (typeof ultra.cmdMf1WriteBlockData === 'function') {
+        return await ultra.cmdMf1WriteBlockData(buf);
+      } else if (typeof ultra.cmdMf1SetBlockData === 'function') {
+        return await ultra.cmdMf1SetBlockData(buf);
+      } else if (typeof ultra.cmdMf1WriteBlock === 'function') {
+        for (let b = 0; b < flatBlocks.length / 16; b++) {
+          await ultra.cmdMf1WriteBlock(b, buf.slice(b * 16, (b + 1) * 16));
+        }
+      }
+    }
+
+    // Flashing del gruppo attivo
     btnFlashGroup.addEventListener('click', async () => {
       const activeCards = groups[currentGroupIndex];
       btnFlashGroup.disabled = true;
@@ -591,7 +615,6 @@
 
         if (!item) {
           try {
-            // Disabilita lo slot se vuoto (TagType 0 = UNKNOWN)
             await ultra.cmdSlotSetEnable(slot, TagType.UNKNOWN || 0, TagType.UNKNOWN || 0);
             log(`Slot ${i + 1}: Disabilitato (vuoto)`);
           } catch (e) {}
@@ -600,10 +623,10 @@
 
         log(`Slot ${i + 1}: Flash (${item.name || item.uid})...`);
         try {
-          // 1. Attiva lo slot sul quale scrivere
-          await ultra.cmdSlotSetActiveSlot(slot);
+          // 1. Attiva lo slot
+          await setSlotActive(slot);
 
-          // 2. Scrivi Anticollisione HF (UID, SAK, ATQA)
+          // 2. Anticollisione HF (UID, SAK, ATQA)
           const uidBytes = item.uid.replace(/\s+/g, '').match(/.{1,2}/g).map(b => parseInt(b, 16));
           await ultra.cmdHf14aSetAntiCollData({
             uid: Buffer.from(uidBytes),
@@ -611,25 +634,18 @@
             sak: Buffer.from([typeof item.sak === 'number' ? item.sak : 8])
           });
 
-          // 3. Scrivi i blocchi Mifare Classic
+          // 3. Blocchi Mifare Classic
           const flattenedData = item.data.flat(Infinity);
-          const dataBuf = Buffer.from(flattenedData);
-          if (typeof ultra.cmdMf1WriteBlockData === 'function') {
-            await ultra.cmdMf1WriteBlockData(dataBuf);
-          } else if (typeof ultra.cmdMf1WriteBlock === 'function') {
-            for (let b = 0; b < flattenedData.length / 16; b++) {
-              await ultra.cmdMf1WriteBlock(b, dataBuf.slice(b * 16, (b + 1) * 16));
-            }
-          }
+          await writeMf1BlockData(flattenedData);
 
-          // 4. Scrivi codice LF EMX se presente
+          // 4. Codice LF EMX Standard (se presente)
           let lfTag = TagType.UNKNOWN || 0;
           if (emxBytes && typeof ultra.cmdLfEm410xSetId === 'function') {
             await ultra.cmdLfEm410xSetId(Buffer.from(emxBytes));
             lfTag = TagType.EM410X || 100;
           }
 
-          // 5. Assegna i tipi di tag e abilita lo slot
+          // 5. Abilita lo slot
           const hfTag = item.tag || TagType.MIFARE_1024 || 1001;
           await ultra.cmdSlotSetEnable(slot, hfTag, lfTag);
 
