@@ -217,10 +217,6 @@
       <input type="checkbox" id="chkAutoDisconnect" checked>
       <label for="chkAutoDisconnect">Disconnetti automaticamente il BLE al termine del flash</label>
     </div>
-    <div class="opt-row">
-      <input type="checkbox" id="chkSafeMode">
-      <label for="chkSafeMode">Modalità sicura (più lenta): riconnetti il BLE tra uno slot e l'altro</label>
-    </div>
   </div>
 
   <div id="log">Pronto. In attesa di comandi...</div>
@@ -261,7 +257,6 @@
     const btnDisconnect = document.getElementById('btnDisconnect');
     const btnFlashGroup = document.getElementById('btnFlashGroup');
     const chkAutoDisconnect = document.getElementById('chkAutoDisconnect');
-    const chkSafeMode = document.getElementById('chkSafeMode');
     const logBox = document.getElementById('log');
 
     function log(msg) {
@@ -276,23 +271,13 @@
     // Attende che lo slot attivo riportato dal device combaci con quello richiesto,
     // per evitare che i comandi successivi (anticoll/blocchi) vengano applicati
     // ancora allo slot precedente per via di un ritardo del firmware nel cambio slot.
-    // Richiede DUE letture consecutive concordi, per scartare risposte BLE "in ritardo"
-    // che potrebbero far sembrare confermato uno stato che in realtà non lo è ancora.
     async function waitForActiveSlot(targetSlot, maxTries = 8) {
-      let consecutiveOk = 0;
       for (let t = 0; t < maxTries; t++) {
         try {
           const active = await ultra.cmdSlotGetActive();
-          if (active === targetSlot) {
-            consecutiveOk++;
-            if (consecutiveOk >= 2) return true;
-          } else {
-            consecutiveOk = 0;
-          }
-        } catch (e) {
-          consecutiveOk = 0;
-        }
-        await sleep(60);
+          if (active === targetSlot) return true;
+        } catch (e) {}
+        await sleep(40);
       }
       return false;
     }
@@ -666,23 +651,6 @@
         }
 
         log(`Slot ${i + 1}: Flash (${item.name || item.uid})...`);
-
-        // MODALITÀ SICURA: riconnette il BLE prima di ogni slot con carta,
-        // per azzerare qualsiasi coda di comandi/risposte residua sulla connessione
-        // e prevenire lo scambio di dati tra slot dovuto a race condition BLE.
-        if (chkSafeMode.checked) {
-          try {
-            log(`Slot ${i + 1}: riconnessione BLE (modalità sicura)...`);
-            await ultra.disconnect();
-            await sleep(400);
-            await ultra.connect();
-            await sleep(200);
-            await ultra.assureDeviceMode(DeviceMode.TAG);
-          } catch (e) {
-            log(`Slot ${i + 1}: errore riconnessione BLE: ${e.message}`);
-          }
-        }
-
         try {
           const hfTag = item.tag || TagType.MIFARE_1024;
           const hasLf = !!emxBytes;
